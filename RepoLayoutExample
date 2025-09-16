@@ -1,0 +1,22 @@
+photon-ltag/
+├─ README.md
+├─ install.sh
+├─ requirements.txt
+├─ .env.example
+├─ photon/
+│  ├─ __init__.py
+│  ├─ app.py                 # starts splash → entry → game
+│  ├─ db.py                  # Postgres queries (get/add player)
+│  ├─ net.py                 # UDP send/receive tasks
+│  ├─ scoring.py             # rules & state
+│  ├─ audio.py               # mp3 control synced to timer
+│  ├─ config.py              # loads env / defaults
+│  ├─ ui/
+│  │  ├─ splash.py
+│  │  ├─ entry.py
+│  │  └─ game.py
+│  └─ assets/                # logo + base icon + mp3 (from instructor’s GitHub)
+│     ├─ logo.jpg
+│     ├─ baseicon.jpg
+│     └─ tracks/            # mp3s
+└─ main.py                   # tiny launcher
