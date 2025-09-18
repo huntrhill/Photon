@@ -44,7 +44,7 @@ Written in **Python 3** with **PyQt5**, it connects to the provided **PostgreSQL
 Clone the repo into your Debian VM:
 
 ```bash
-git clone https://github.com/<your-username>/Photon.git
+git clone https://github.com/huntrhill/Photon.git
 cd Photon
 chmod +x install.sh
 ./install.sh
