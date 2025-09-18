@@ -49,3 +49,26 @@ cd Photon
 chmod +x install.sh
 ./install.sh
 ```
+
+## 👥 Team
+
+| GitHub | Real Name | Role |
+|---|---|---|
+| @huntrhill | Hunter Hill       | Lead / UI - Entry            |
+| @member2   | Chance Pickett    | UI – Splash/Scoring          |
+| @member3   | Michael Purtle    | Networking/Audio / UI – Game |
+| @coaluh    | Cody Uhl           | QA / Docs / Architecture      |
+
+> All team members used real names on GitHub or are cross-referenced above.
+
+## 🔌 Quick Test (after install)
+
+Open **Terminal A** (listener for 7500):
+```bash
+python3 - <<'PY'
+import socket
+s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.bind(("0.0.0.0",7500))
+print("Listening on 0.0.0.0:7500…")
+while True: print(s.recvfrom(4096)[0].decode().strip())
+PY
+
