@@ -1,23 +1,23 @@
-import psycopg2
+import psycopg2, os
 from psycopg2.extras import RealDictCursor
-from .config import PG
 
 def _conn():
-    return psycopg2.connect(cursor_factory=RealDictCursor, **PG)
+    return psycopg2.connect(
+        host=os.getenv("PGHOST", "127.0.0.1"),
+        port=int(os.getenv("PGPORT", "5432")),
+        dbname=os.getenv("PGDATABASE", "photon"),
+        user=os.getenv("PGUSER", "postgres"),
+        password=os.getenv("PGPASSWORD", "postgres"),
+        cursor_factory=RealDictCursor,
+    )
 
-def get_or_create_player(player_id: int, codename: str|None):
-    """
-    If player_id exists: return row & ignore codename.
-    Else: require codename and insert.
-    Assumes table `players(id INT PRIMARY KEY, codename TEXT, team TEXT)`
-    (Do NOT alter schema; only insert/delete as instructed.)
-    """
+def get_player(player_id:int):
     with _conn() as conn, conn.cursor() as cur:
-        cur.execute("SELECT id, codename, team FROM players WHERE id=%s", (player_id,))
-        row = cur.fetchone()
-        if row:
-            return row
-        if not codename:
-            raise ValueError("Codename required for new player.")
-        cur.execute("INSERT INTO players(id, codename) VALUES (%s,%s) RETURNING id, codename", (player_id, codename))
+        cur.execute("SELECT id, codename FROM players WHERE id=%s", (player_id,))
+        return cur.fetchone()
+
+def create_player(player_id:int, codename:str):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("INSERT INTO players(id, codename) VALUES (%s,%s) RETURNING id, codename",
+                    (player_id, codename))
         return cur.fetchone()
