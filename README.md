@@ -31,6 +31,12 @@ Written in **Python 3** with **PyQt5**, it connects to the provided **PostgreSQL
 
 ---
 
+## 📂 Assets
+
+This project includes only the assets needed from the instructor’s [photon-main](https://github.com/jstrother123/photon-main) repository.  
+
+---
+
 ## 🖥️ System Requirements
 
 - **Debian 12+ VM** (provided by instructor)
@@ -49,6 +55,7 @@ cd Photon
 chmod +x install.sh
 ./install.sh
 ```
+---
 
 ## 👥 Team
 
@@ -60,6 +67,8 @@ chmod +x install.sh
 | @coaluh    | Cody Uhl           | QA / Docs / Architecture      |
 
 > All team members used real names on GitHub or are cross-referenced above.
+
+---
 
 ## 🔌 Quick Test (after install)
 
