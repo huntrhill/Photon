@@ -1,6 +1,6 @@
 from PyQt5 import QtWidgets, QtCore, QtGui
 import os
-from ..db import get_player, add_player
+from db import get_player, add_player
 
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
 
