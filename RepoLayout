@@ -1,0 +1,45 @@
+Photon/
+├─ README.md
+├─ install.sh
+├─ RepoLayout
+├─ requirements.txt
+├─ .gitignore
+├─ .env
+├─ main.py                   # tiny launcher
+└─ PhotonGame/
+│  ├─ __init__.py
+│  ├─ app.py                 # starts splash → entry → game
+│  ├─ db.py                  # Postgres queries (get/add player)
+│  ├─ net.py                 # UDP send/receive tasks
+│  ├─ scoring.py             # rules & state
+│  ├─ audio.py               # mp3 control synced to timer
+│  ├─ config.py              # loads env / defaults
+│  ├─ ui/
+│  │  ├─ splash.py
+│  │  ├─ entry.py
+│  │  └─ game.py
+│  └─ assets/                # logo + base icon + mp3 (from instructor’s GitHub)
+│  │  ├─ GameSounds/
+│  │  │  ├─ Photon-Close-Program.wav
+│  │  │  ├─ Photon-Empty-Bin.wav
+│  │  │  ├─ Photon-Exit.wav
+│  │  │  ├─ Photon-Intruder.wav
+│  │  │  └─ Photon-Start.wav
+│     ├─ images/
+│  │  │  ├─ baseicon.jpg
+│  │  │  └─ logo.jpg
+│     ├─ sfx/
+│  │  │  ├─ gethit.wav
+│  │  │  ├─ hit.wav
+│  │  │  ├─ hitown.wav
+│  │  │  ├─ miss.wav
+│  │  │  └─ reset.wav
+│  │  └─ tracks/            # mp3s
+│  │  │  ├─ Track01.mp3
+│  │  │  ├─ Track02.mp3
+│  │  │  ├─ Track03.mp3
+│  │  │  ├─ Track04.mp3
+│  │  │  ├─ Track05.mp3
+│  │  │  ├─ Track06.mp3
+│  │  │  ├─ Track07.mp3
+│  │  │  └─ Track08.mp3
