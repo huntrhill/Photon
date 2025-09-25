@@ -63,8 +63,8 @@ chmod +x install.sh
 |---|---|---|
 | @huntrhill | Hunter Hill       | Lead / UI - Entry            |
 | @member2   | Chance Pickett    | UI – Splash/Scoring          |
-| @member3   | Michael Purtle    | Networking/Audio / UI – Game |
-| @coaluh    | Cody Uhl           | QA / Docs / Architecture      |
+| @dugku     | Michael Purtle    | Networking/Audio / UI – Game |
+| @coaluh    | Cody Uhl          | QA / Docs / Architecture     |
 
 > All team members used real names on GitHub or are cross-referenced above.
 
