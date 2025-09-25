@@ -18,11 +18,6 @@ sudo apt-get install -y \
   libpulse0 libasound2 \
   mpg123 git curl ca-certificates
 
-# Ensure assets structure exists (nice for first-time clones)
-mkdir -p PhotonGame/assets/images
-mkdir -p PhotonGame/assets/audio/tracks
-mkdir -p PhotonGame/assets/audio/sfx
-
 # (Re)create venv — may be recreated later if we fall back to system PyQt5/pygame
 if [ ! -d ".venv" ]; then
   banner "✓ Creating Python virtual environment (.venv)…"
