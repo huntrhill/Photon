@@ -7,10 +7,10 @@ banner() { echo -e "\n\033[1;36m$*\033[0m"; }
 warn()   { echo -e "\n\033[1;33m$*\033[0m"; }
 die()    { echo -e "\n\033[1;31m$*\033[0m"; exit 1; }
 
-banner "✓ Updating apt (requires sudo)…"
+banner "Updating apt (requires sudo)…"
 sudo apt-get update -y
 
-banner "✓ Installing base system deps…"
+banner "Installing base system deps…"
 sudo apt-get install -y \
   python3-venv python3-dev python3-pip \
   build-essential libpq-dev \
@@ -20,11 +20,11 @@ sudo apt-get install -y \
 
 # (Re)create venv — may be recreated later if we fall back to system PyQt5/pygame
 if [ ! -d ".venv" ]; then
-  banner "✓ Creating Python virtual environment (.venv)…"
+  banner "Creating Python virtual environment (.venv)…"
   python3 -m venv .venv
 fi
 
-banner "✓ Activating venv & upgrading pip toolchain…"
+banner "Activating venv & upgrading pip toolchain…"
 # shellcheck disable=SC1091
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
@@ -42,7 +42,7 @@ fi
 # Prefer binary wheels to avoid heavy source builds
 export PIP_ONLY_BINARY=":all:"
 
-banner "✓ Installing Python deps from requirements.txt (prefer wheels)…"
+banner "Installing Python deps from requirements.txt (prefer wheels)…"
 if ! pip install -r requirements.txt; then
   warn "Bulk pip install failed — installing one by one with fallbacks…"
 
@@ -91,7 +91,7 @@ if ! pip install -r requirements.txt; then
   fi
 fi
 
-banner "✓ Verifying imports…"
+banner "Verifying imports…"
 python - <<'PY'
 try:
     import PyQt5, pygame, psycopg2
