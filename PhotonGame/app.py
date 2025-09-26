@@ -1,9 +1,9 @@
 import asyncio, sys, time
 from PyQt5 import QtWidgets, QtCore
-from .net import udp_sender, udp_receiver
+from .net import udp_sender, udp_receiver, UdpPeer
 from .scoring import State, handle_rx
 from .audio import init_tracks, play_random
-from . import ui
+from PhotonGame import build_main_window
 
 class Controller(QtCore.QObject):
     # Signals to decouple UI from logic if you want later
@@ -51,44 +51,44 @@ class Controller(QtCore.QObject):
 
         self.updated.emit()
 
-async def run_app():
-    app = QtWidgets.QApplication(sys.argv)
+async def run_app(app):
+		
+		ctrl = Controller()
+		
+		# Load audio tracks (assets/tracks)
+		# If your assets are at PhotonGame/assets, adjust this path in ui.build_main_window
+		# We pass tracks into controller after UI picks a root path to keep it simple.
+		win, splash, entry, game, assets_path = build_main_window(ctrl)
+		
+		# init audio after we know assets_path
+		ctrl.tracks = init_tracks(assets_path)
+		
+		# Wire simple UI actions
+		entry.addPlayerRequested.connect(lambda pid, codename, eqid, team: on_add_player(ctrl, entry, pid, codename, eqid, team))
+		entry.startRequested.connect(lambda: on_start(ctrl, win, game))
+		entry.clearRequested.connect(lambda: on_clear(ctrl, entry))
+		
+		game.backRequested.connect(lambda: win.setCurrentIndex(1))  # back to entry
+		ctrl.updated.connect(lambda: game.refresh(ctrl.state, ctrl.seconds_left))
+		
+		# Timers:
+		tick_timer = QtCore.QTimer()
+		tick_timer.timeout.connect(ctrl.tick)
+		tick_timer.start(1000)
+		
+		# UDP plumbing
+		async def on_rx(line: str):
+			handle_rx(ctrl.state, line, ctrl.send_int)
+			game.refresh(ctrl.state, ctrl.seconds_left)
 
-    ctrl = Controller()
+		asyncio.create_task(udp_sender(ctrl.tx_queue))
+		asyncio.create_task(udp_receiver(on_rx))
 
-    # Load audio tracks (assets/tracks)
-    # If your assets are at PhotonGame/assets, adjust this path in ui.build_main_window
-    # We pass tracks into controller after UI picks a root path to keep it simple.
-    win, splash, entry, game, assets_path = ui.build_main_window(ctrl)
-
-    # init audio after we know assets_path
-    ctrl.tracks = init_tracks(assets_path)
-
-    # Wire simple UI actions
-    entry.addPlayerRequested.connect(lambda pid, codename, eqid, team: on_add_player(ctrl, entry, pid, codename, eqid, team))
-    entry.startRequested.connect(lambda: on_start(ctrl, win, game))
-    entry.clearRequested.connect(lambda: on_clear(ctrl, entry))
-
-    game.backRequested.connect(lambda: win.setCurrentIndex(1))  # back to entry
-    ctrl.updated.connect(lambda: game.refresh(ctrl.state, ctrl.seconds_left))
-
-    # Timers:
-    tick_timer = QtCore.QTimer()
-    tick_timer.timeout.connect(ctrl.tick)
-    tick_timer.start(1000)
-
-    # UDP plumbing
-    async def on_rx(line: str):
-        handle_rx(ctrl.state, line, ctrl.send_int)
-        game.refresh(ctrl.state, ctrl.seconds_left)
-
-    asyncio.create_task(udp_sender(ctrl.tx_queue))
-    asyncio.create_task(udp_receiver(on_rx))
-
-    win.setCurrentIndex(0)  # splash
-    splash.start()
-
-    sys.exit(app.exec_())
+		
+		win.setCurrentIndex(0)  # splash
+		splash.start()
+		
+		sys.exit(app.exec_())
 
 def on_add_player(ctrl: Controller, entry, pid: int, codename: str|None, eqid: int, team: str):
     """
@@ -97,10 +97,12 @@ def on_add_player(ctrl: Controller, entry, pid: int, codename: str|None, eqid: i
     - Broadcast equipment id immediately
     """
     row = entry.get_or_create_player(pid, codename)
-    ctrl.state.codename[pid] = row["codename"]
+    pid, codename = row
+    print(pid, codename)
+    ctrl.state.codename[pid] = codename
     ctrl.state.team[pid] = team
     ctrl.send_int(eqid)  # immediate broadcast per spec
-    entry.add_to_roster(pid, row["codename"], team)
+    entry.add_to_roster(pid, codename, team)
 
 def on_start(ctrl: Controller, win, game):
     if not ctrl.game_running:
