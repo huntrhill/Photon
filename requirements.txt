@@ -2,3 +2,4 @@ PyQt5==5.15.11
 psycopg2-binary==2.9.9
 pygame==2.6.1
 python-dotenv==1.0.1
+qasync==0.24.0
