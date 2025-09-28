@@ -10,7 +10,7 @@ class SplashScreen(QtWidgets.QWidget):
         self.v.setContentsMargins(24, 24, 24, 24)
 
         self.logo = QtWidgets.QLabel(alignment=QtCore.Qt.AlignCenter)
-        self.logo.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.logo.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
         self.logo.setScaledContents(True)
 
         p = os.path.join(self.assets_dir, "images", "logo.jpg")
