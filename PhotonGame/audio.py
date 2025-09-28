@@ -1,82 +1,140 @@
-# PhotonGame/audio.py
-from pathlib import Path
-import random
-import pygame
+import os, random, pygame, sys, io
 
-AUDIO_EXTS_MUSIC = {".mp3"}
-AUDIO_EXTS_SFX   = {".wav", ".ogg"}
-
-def _safe_init():
-    if not pygame.mixer.get_init():
-        pygame.mixer.init()
-
-def _load_sound(p: Path):
+# ---------- robust mixer init ----------
+def _init_mixer():
+    # Try to initialize; if it fails, try a couple of common drivers and a 'dummy' fallback
+    tried = []
+    for driver in (os.getenv("SDL_AUDIODRIVER"), "pulseaudio", "alsa", "dsp", "dummy"):
+        if not driver:
+            continue
+        try:
+            os.environ["SDL_AUDIODRIVER"] = driver
+            pygame.mixer.quit()
+            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+            # quick sanity: get_init returns (freq, format, channels) or None
+            if pygame.mixer.get_init():
+                return True
+        except Exception as e:
+            tried.append((driver, str(e)))
+    # last attempt with defaults
     try:
-        return pygame.mixer.Sound(str(p))
+        pygame.mixer.quit()
+        pygame.mixer.init()
+        return pygame.mixer.get_init() is not None
+    except Exception as e:
+        tried.append(("default", str(e)))
+        print("[audio] Mixer init failed:", tried, file=sys.stderr)
+        return False
+
+def _is_probably_mp3(path: str) -> bool:
+    # quick sniff: start with 'ID3' or an MPEG frame sync 0xFFEx
+    try:
+        with open(path, "rb") as f:
+            head = f.read(4)
+        if head.startswith(b"ID3"):
+            return True
+        if len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0:
+            return True
     except Exception:
-        return None
+        pass
+    return False
 
-def init_audio(assets_root: str):
+def _find_files(root: str, sub: str, exts: tuple[str, ...]):
+    base = os.path.join(root, sub)
+    if not os.path.isdir(base):
+        return []
+    return [
+        os.path.join(base, f)
+        for f in os.listdir(base)
+        if os.path.isfile(os.path.join(base, f)) and f.lower().endswith(exts)
+    ]
+
+def init_audio(assets_dir: str):
     """
-    Loads background tracks (MP3) and common SFX.
-    Returns:
-      {"tracks": [str mp3 paths...], "sfx": {name: pygame.Sound|None}}
+    Initialize pygame mixer and load:
+      - tracks: MP3 files under assets/tracks/
+      - sfx: WAV files under assets/sfx/ and assets/GameSounds/
+    Returns dict: {"tracks": [paths], "sfx": {"start": Sound, "end": Sound, "hit": Sound, ...}}
     """
-    _safe_init()
-    root = Path(assets_root)
+    pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
+    pygame.init()
 
-    # --- music ---
-    tracks = []
-    tdir = root / "tracks"
-    if tdir.is_dir():
-        for f in sorted(tdir.iterdir()):
-            if f.is_file() and f.suffix.lower() in AUDIO_EXTS_MUSIC:
-                tracks.append(str(f))
+    if not _init_mixer():
+        print("[audio] WARNING: Mixer not initialized; audio will be disabled.", file=sys.stderr)
+        return {"tracks": [], "sfx": {}}
 
-    # --- GameSounds ---
-    gs = {}
-    gdir = root / "GameSounds"
-    if gdir.is_dir():
-        for f in gdir.iterdir():
-            if f.is_file() and f.suffix.lower() in AUDIO_EXTS_SFX:
-                gs[f.name.lower()] = _load_sound(f)
+    # ---- tracks (MP3) ----
+    track_paths = _find_files(assets_dir, "tracks", (".mp3",))
+    # filter out likely-non-mp3 files (e.g., LFS pointers)
+    track_paths = [p for p in track_paths if _is_probably_mp3(p)]
 
-    # expected names (case-insensitive)
-    # map multiple options to canonical keys
-    sfx = {
-        "start": gs.get("photon-start.wav"),
-        "end":   gs.get("photon-close-program.wav") or gs.get("photon-exit.wav"),
-        "intruder": gs.get("photon-intruder.wav"),
-        "emptybin": gs.get("photon-empty-bin.wav"),
+    # ---- SFX (WAV) ----
+    sfx = {}
+    def load_wav_safe(path):
+        try:
+            return pygame.mixer.Sound(path)
+        except Exception as e:
+            print(f"[audio] Failed to load sfx {path}: {e}", file=sys.stderr)
+            return None
+
+    # Preferred names based on your layout
+    # GameSounds: Photon-Start.wav, Photon-Exit.wav, Photon-Intruder.wav, Photon-Close-Program.wav
+    # sfx: hit.wav, hitown.wav, gethit.wav, miss.wav, reset.wav
+    gs = os.path.join(assets_dir, "GameSounds")
+    sfx_dir = os.path.join(assets_dir, "sfx")
+
+    mapping = {
+        "start": os.path.join(gs, "Photon-Start.wav"),
+        "end":   os.path.join(gs, "Photon-Exit.wav"),
+        "intruder": os.path.join(gs, "Photon-Intruder.wav"),
+        "close": os.path.join(gs, "Photon-Close-Program.wav"),
+        "hit":   os.path.join(sfx_dir, "hit.wav"),
+        "hitown":os.path.join(sfx_dir, "hitown.wav"),
+        "gethit":os.path.join(sfx_dir, "gethit.wav"),
+        "miss":  os.path.join(sfx_dir, "miss.wav"),
+        "reset": os.path.join(sfx_dir, "reset.wav"),
     }
 
-    # --- sfx (gameplay) ---
-    sfxdir = root / "sfx"
-    if sfxdir.is_dir():
-        names = {f.name.lower(): f for f in sfxdir.iterdir()
-                 if f.is_file() and f.suffix.lower() in AUDIO_EXTS_SFX}
-        sfx["hit"]    = _load_sound(names.get("hit.wav")) or _load_sound(names.get("gethit.wav"))
-        sfx["hitown"] = _load_sound(names.get("hitown.wav"))  # friendly fire
-        sfx["miss"]   = _load_sound(names.get("miss.wav"))
-        sfx["reset"]  = _load_sound(names.get("reset.wav"))
+    for key, path in mapping.items():
+        if os.path.isfile(path):
+            snd = load_wav_safe(path)
+            if snd:
+                sfx[key] = snd
 
-    return {"tracks": tracks, "sfx": sfx}
+    return {"tracks": track_paths, "sfx": sfx}
 
-def play_random_music(tracks):
-    _safe_init()
+# ---------- playback helpers ----------
+def stop_music():
+    try:
+        pygame.mixer.music.stop()
+    except Exception:
+        pass
+
+def play_random_music(tracks: list[str]):
     if not tracks:
         return
-    pygame.mixer.music.load(random.choice(tracks))
-    pygame.mixer.music.play()
+    # Stop any existing stream before (re)loading
+    stop_music()
 
-def stop_music():
-    if pygame.mixer.get_init():
-        pygame.mixer.music.stop()
-
-def play_sfx(sfx_map: dict, key: str):
-    snd = sfx_map.get(key)
-    if snd is not None:
+    # Shuffle through candidates until one loads/plays or we run out
+    shuffled = tracks[:]
+    random.shuffle(shuffled)
+    for p in shuffled:
         try:
-            snd.play()
-        except Exception:
-            pass
+            pygame.mixer.music.load(p)
+            pygame.mixer.music.play()
+            return
+        except Exception as e:
+            # Bad file? Log and try the next one
+            print(f"[audio] Skipping track {p}: {e}", file=sys.stderr)
+            continue
+    print("[audio] No playable MP3 tracks found.", file=sys.stderr)
+
+def play_sfx(sfx: dict, name: str):
+    snd = sfx.get(name)
+    if not snd:
+        return
+    try:
+        snd.play()
+    except Exception as e:
+        print(f"[audio] SFX '{name}' failed: {e}", file=sys.stderr)
