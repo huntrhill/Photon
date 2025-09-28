@@ -1,4 +1,3 @@
-# PhotonGame/app.py
 import asyncio, sys, os
 from PyQt5 import QtWidgets, QtCore
 from qasync import QEventLoop
