@@ -4,7 +4,7 @@ from qasync import QEventLoop
 
 from .net import udp_sender, udp_receiver, Endpoints, endpoints_from_env
 from .scoring import State, handle_rx
-from .audio import init_tracks, play_random
+from .audio import init_audio, play_random_music, stop_music, play_sfx
 from . import build_main_window  # from package-local __init__.py
 
 
@@ -16,6 +16,7 @@ class Controller(QtCore.QObject):
         self.tx_queue = asyncio.Queue()
         self.state = State()
         self.tracks = []
+        self.sfx = {}
         self.game_running = False
         self.seconds_left = 0
 
@@ -32,7 +33,8 @@ class Controller(QtCore.QObject):
         if self.game_running:
             return
         self.seconds_left = 30 + 6 * 60  # 30s warning + 6min game
-        play_random(self.tracks)
+        play_sfx(self.sfx, "start")
+        play_random_music(self.tracks)
         self.game_running = True
 
     def tick(self):
@@ -50,7 +52,6 @@ class Controller(QtCore.QObject):
                 self.send_int(221)  # game end x3
                 QtCore.QThread.msleep(200)
             self.game_running = False
-
         self.updated.emit()
 
     # ---------- Networking (qasync-friendly) ----------
@@ -89,7 +90,9 @@ def run_app():
     win, splash, entry, game, assets_path = build_main_window(ctrl)
 
     # audio after assets path known
-    ctrl.tracks = init_tracks(assets_path)
+    audio = init_audio(assets_path)
+    ctrl.tracks = audio["tracks"]
+    ctrl.sfx    = audio["sfx"]
 
     # wire UI
     entry.addPlayerRequested.connect(
@@ -108,9 +111,31 @@ def run_app():
     tick_timer.start(1000)
 
     # UDP coroutines share this loop
-    async def on_rx(line: str):
-        handle_rx(ctrl.state, line, ctrl.send_int)
-        game.refresh(ctrl.state, ctrl.seconds_left)
+   async def on_rx(line: str):
+    # Let scoring update state first
+    handle_rx(ctrl.state, line, ctrl.send_int)
+
+    # Decide SFX
+    parts = line.split(":", 1)
+    if len(parts) == 2:
+        tx, rhs = parts[0].strip(), parts[1].strip()
+        if rhs in ("43", "53"):
+            # base scored
+            play_sfx(ctrl.sfx, "intruder")
+        else:
+            # player tag: use team info to choose friendly fire vs normal hit
+            try:
+                tx_i, hit_i = int(tx), int(rhs)
+                t_tx  = ctrl.state.team.get(tx_i)
+                t_hit = ctrl.state.team.get(hit_i)
+                if t_tx and t_hit and t_tx == t_hit:
+                    play_sfx(ctrl.sfx, "hitown")   # friendly fire
+                else:
+                    play_sfx(ctrl.sfx, "hit")      # normal hit
+            except ValueError:
+                pass
+    # Update UI
+    game.refresh(ctrl.state, ctrl.seconds_left)
 
     ctrl.start_network(on_rx)
 
