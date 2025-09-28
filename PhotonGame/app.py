@@ -1,3 +1,4 @@
+# PhotonGame/app.py
 import asyncio, sys, os
 from PyQt5 import QtWidgets, QtCore
 from qasync import QEventLoop
@@ -51,7 +52,11 @@ class Controller(QtCore.QObject):
             for _ in range(3):
                 self.send_int(221)  # game end x3
                 QtCore.QThread.msleep(200)
+            # finish SFX + stop music
+            play_sfx(self.sfx, "end")
+            stop_music()
             self.game_running = False
+
         self.updated.emit()
 
     # ---------- Networking (qasync-friendly) ----------
@@ -100,7 +105,7 @@ def run_app():
     )
     entry.startRequested.connect(lambda: on_start(ctrl, win, game))
     entry.clearRequested.connect(lambda: on_clear(ctrl, entry))
-    add_settings_button(entry, ctrl, win, game)  # NEW: Settings
+    add_settings_button(entry, ctrl, win, game)  # Settings button
 
     game.backRequested.connect(lambda: win.setCurrentIndex(1))
     ctrl.updated.connect(lambda: game.refresh(ctrl.state, ctrl.seconds_left))
@@ -110,133 +115,29 @@ def run_app():
     tick_timer.timeout.connect(ctrl.tick)
     tick_timer.start(1000)
 
-# UDP coroutines share this loop
-async def on_rx(line: str):
-    # Let scoring update state first
-    handle_rx(ctrl.state, line, ctrl.send_int)
+    # UDP coroutines share this loop
+    async def on_rx(line: str):
+        # Update scoring first
+        handle_rx(ctrl.state, line, ctrl.send_int)
 
-    # Decide SFX
-    parts = line.split(":", 1)
-    if len(parts) == 2:
-        tx, rhs = parts[0].strip(), parts[1].strip()
-        if rhs in ("43", "53"):
-            # base scored
-            play_sfx(ctrl.sfx, "intruder")
-        else:
-            # player tag: use team info to choose friendly fire vs normal hit
-            try:
-                tx_i, hit_i = int(tx), int(rhs)
-                t_tx  = ctrl.state.team.get(tx_i)
-                t_hit = ctrl.state.team.get(hit_i)
-                if t_tx and t_hit and t_tx == t_hit:
-                    play_sfx(ctrl.sfx, "hitown")   # friendly fire
-                else:
-                    play_sfx(ctrl.sfx, "hit")      # normal hit
-            except ValueError:
-                pass
-    # Update UI
-    game.refresh(ctrl.state, ctrl.seconds_left)
+        # SFX selection
+        parts = line.split(":", 1)
+        if len(parts) == 2:
+            tx, rhs = parts[0].strip(), parts[1].strip()
+            if rhs in ("43", "53"):
+                # base scored
+                play_sfx(ctrl.sfx, "intruder")
+            else:
+                # player tag: decide friendly vs normal
+                try:
+                    tx_i, hit_i = int(tx), int(rhs)
+                    t_tx  = ctrl.state.team.get(tx_i)
+                    t_hit = ctrl.state.team.get(hit_i)
+                    if t_tx and t_hit and t_tx == t_hit:
+                        play_sfx(ctrl.sfx, "hitown")   # friendly fire
+                    else:
+                        play_sfx(ctrl.sfx, "hit")      # normal hit
+                except ValueError:
+                    pass
 
-    ctrl.start_network(on_rx)
-
-    win.setCurrentIndex(0)
-    splash.start()
-
-    # run unified loop
-    with loop:
-        sys.exit(loop.run_forever())
-
-
-def on_add_player(ctrl: Controller, entry, pid: int, codename: str | None, eqid: int, team: str):
-    row = entry.get_or_create_player(pid, codename)
-    if isinstance(row, dict):
-        pid2, codename2 = row.get("id"), row.get("codename")
-    else:
-        pid2, codename2 = row  # (id, codename)
-    ctrl.state.codename[pid2] = codename2
-    ctrl.state.team[pid2] = team
-    ctrl.send_int(eqid)  # broadcast equipment id immediately
-    entry.add_to_roster(pid2, codename2, team)
-
-
-def on_start(ctrl: Controller, win, game):
-    if not ctrl.game_running:
-        ctrl.start_pre_game()
-        win.setCurrentIndex(2)
-        game.refresh(ctrl.state, ctrl.seconds_left)
-
-
-def on_clear(ctrl: Controller, entry):
-    ctrl.state = State()
-    entry.clear_rosters()
-
-
-# ---------------- Settings UI ----------------
-
-class SettingsDialog(QtWidgets.QDialog):
-    def __init__(self, parent, ep: Endpoints):
-        super().__init__(parent)
-        self.setWindowTitle("Network Settings")
-        form = QtWidgets.QFormLayout(self)
-
-        self.send_addr = QtWidgets.QLineEdit(ep.send_addr)
-        self.send_port = QtWidgets.QSpinBox(); self.send_port.setRange(1, 65535); self.send_port.setValue(ep.send_port)
-        self.recv_addr = QtWidgets.QLineEdit(ep.recv_addr)
-        self.recv_port = QtWidgets.QSpinBox(); self.recv_port.setRange(1, 65535); self.recv_port.setValue(ep.recv_port)
-
-        form.addRow("Send Address:", self.send_addr)
-        form.addRow("Send Port:", self.send_port)
-        form.addRow("Bind Address:", self.recv_addr)
-        form.addRow("Receive Port:", self.recv_port)
-
-        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        btns.accepted.connect(self.accept)
-        btns.rejected.connect(self.reject)
-        form.addRow(btns)
-
-    def get_endpoints(self) -> Endpoints:
-        return Endpoints(
-            send_addr=self.send_addr.text().strip() or "127.0.0.1",
-            send_port=int(self.send_port.value()),
-            recv_addr=self.recv_addr.text().strip() or "0.0.0.0",
-            recv_port=int(self.recv_port.value()),
-        )
-
-
-def add_settings_button(entry_screen_widget, ctrl: Controller, win, game):
-    btn = QtWidgets.QPushButton("Settings")
-    entry_layout = entry_screen_widget.layout()
-    entry_layout.addWidget(btn, 0, QtCore.Qt.AlignRight)
-
-    def open_settings():
-        dlg = SettingsDialog(win, ctrl.endpoints)
-        if dlg.exec_() == QtWidgets.QDialog.Accepted:
-            new_ep = dlg.get_endpoints()
-            _write_env({
-                "PHOTON_SEND_ADDR": new_ep.send_addr,
-                "PHOTON_SEND_PORT": str(new_ep.send_port),
-                "PHOTON_BIND_ADDR": new_ep.recv_addr,
-                "PHOTON_RECV_PORT": str(new_ep.recv_port),
-            })
-            async def do_rebind():
-                await ctrl.rebind_network(new_ep, lambda line: (handle_rx(ctrl.state, line, ctrl.send_int),
-                                                                game.refresh(ctrl.state, ctrl.seconds_left)))
-            asyncio.get_event_loop().create_task(do_rebind())
-
-    btn.clicked.connect(open_settings)
-
-
-def _write_env(updates: dict, env_path: str = ".env"):
-    lines = []
-    if os.path.exists(env_path):
-        with open(env_path, "r", encoding="utf-8") as f:
-            lines = f.read().splitlines()
-    kv = {}
-    for ln in lines:
-        if "=" in ln and not ln.strip().startswith("#"):
-            k, v = ln.split("=", 1)
-            kv[k.strip()] = v
-    kv.update(updates)
-    with open(env_path, "w", encoding="utf-8") as f:
-        for k, v in kv.items():
-            f.write(f"{k}={v}\n")
+        game.refresh(ctrl.state, ctrl.secon
