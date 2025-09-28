@@ -31,7 +31,7 @@ fi
 # 3) bulk install
 echo "==> Installing dependencies from requirements.txt…"
 if ! pip install -r requirements.txt; then
-  echo "⚠️  Bulk install failed — retrying each package individually…"
+  echo "Bulk install failed — retrying each package individually…"
   # Parse package names (strip comments/extras)
   pkgs=$(python - <<'PY'
 import re, sys
@@ -52,15 +52,15 @@ PY
         echo "   ❌ FAILED: $p"
         failed+=("$p")
       else
-        echo "   ✅ OK (from source): $p"
+        echo "   OK (from source): $p"
       fi
     else
-      echo "   ✅ OK: $p"
+      echo "   OK: $p"
     fi
   done
   if [ "${#failed[@]}" -ne 0 ]; then
     echo ""
-    echo "❌ Some packages failed to install:"
+    echo "Some packages failed to install:"
     for f in "${failed[@]}"; do echo "   - $f"; done
     echo "Tip: these may need system libs/wheels. Install OS deps or adjust versions, then rerun."
     exit 1
@@ -120,7 +120,7 @@ for pkg,mod in ok:
 PY
 
 echo ""
-echo "✅ Install complete."
+echo "Install complete."
 echo "To run:"
 echo "  source .venv/bin/activate"
 echo "  python3 main.py"
