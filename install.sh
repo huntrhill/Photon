@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "==> Using Python: $(command -v python3 || true)"
-echo "==> Using Pip:    $(command -v pip3 || true)"
+echo "==> Python: $(command -v python3 || true)"
+echo "==> Pip:    $(command -v pip3 || true)"
 
-# 1) Minimal system prerequisites (kept simple)
+# 0) sanity
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "Python3 not found. Please install Python 3 first."
+  echo "Python3 not found. Install Python 3 and retry." >&2
   exit 1
 fi
-if ! command -v python3 -m venv >/dev/null 2>&1; then
-  echo "python3-venv not available. On Debian: sudo apt-get update && sudo apt-get install -y python3-venv"
-  exit 1
-fi
+python3 - <<'PY' || { echo "python3-venv not available. On Debian: sudo apt-get install -y python3-venv"; exit 1; }
+import sys, venv
+PY
 
-# 2) Create venv (if missing) and upgrade toolchain
+# 1) venv + toolchain
 if [ ! -d ".venv" ]; then
   echo "==> Creating virtual environment (.venv)…"
   python3 -m venv .venv
@@ -23,69 +22,100 @@ fi
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 
-# 3) Install requirements
+# 2) requirements present?
 if [ ! -f "requirements.txt" ]; then
-  echo "requirements.txt not found in current directory."
+  echo "requirements.txt not found." >&2
   exit 1
 fi
 
-echo "==> Installing Python dependencies from requirements.txt…"
-pip install -r requirements.txt
+# 3) bulk install
+echo "==> Installing dependencies from requirements.txt…"
+if ! pip install -r requirements.txt; then
+  echo "⚠️  Bulk install failed — retrying each package individually…"
+  # Parse package names (strip comments/extras)
+  pkgs=$(python - <<'PY'
+import re, sys
+pat = re.compile(r'^\s*([A-Za-z0-9_.\-]+)')
+for line in open("requirements.txt", encoding="utf-8"):
+    s=line.strip()
+    if not s or s.startswith("#"): continue
+    m=pat.match(s)
+    if m: print(m.group(1))
+PY
+)
+  failed=()
+  for p in $pkgs; do
+    echo "➡ pip install $p"
+    if ! pip install --no-cache-dir "$p"; then
+      echo "   ↳ retrying $p with no-binary fallback (may attempt source build)…"
+      if ! pip install --no-binary=:all: --no-cache-dir "$p"; then
+        echo "   ❌ FAILED: $p"
+        failed+=("$p")
+      else
+        echo "   ✅ OK (from source): $p"
+      fi
+    else
+      echo "   ✅ OK: $p"
+    fi
+  done
+  if [ "${#failed[@]}" -ne 0 ]; then
+    echo ""
+    echo "❌ Some packages failed to install:"
+    for f in "${failed[@]}"; do echo "   - $f"; done
+    echo "Tip: these may need system libs/wheels. Install OS deps or adjust versions, then rerun."
+    exit 1
+  fi
+fi
 
-# 4) Validate imports (maps package names to import names)
+# 4) validate imports
+echo "==> Validating imports…"
 python - <<'PY'
 import sys, re
 
-# Map package name -> import name(s)
 NAME_MAP = {
-    # common package -> module mappings
     'psycopg2-binary': ['psycopg2'],
-    'python-dotenv':   ['dotenv'],
-    'pyqt5':           ['PyQt5'],
-    'pyqt6':           ['PyQt6'],
-    'pygame':          ['pygame'],
-    'qasync':          ['qasync'],
+    'python-dotenv'  : ['dotenv'],
+    'pyqt5'          : ['PyQt5'],
+    'pyqt6'          : ['PyQt6'],
+    'pygame'         : ['pygame'],
+    'qasync'         : ['qasync'],
 }
 
-def parse_requirements(path="requirements.txt"):
-    pkgs = []
-    pat = re.compile(r'^\s*([A-Za-z0-9_.\-]+)')
-    with open(path, 'r', encoding='utf-8') as f:
+def req_names(path="requirements.txt"):
+    pkgs=[]
+    pat=re.compile(r'^\s*([A-Za-z0-9_.\-]+)')
+    with open(path,encoding="utf-8") as f:
         for line in f:
             s=line.strip()
-            if not s or s.startswith('#'): 
-                continue
-            m = pat.match(s)
-            if m:
-                pkgs.append(m.group(1))
+            if not s or s.startswith("#"): continue
+            m=pat.match(s)
+            if m: pkgs.append(m.group(1))
     return pkgs
 
-failed = []
-tested = []
-
-for raw in parse_requirements():
-    key = raw.lower()
-    imports = NAME_MAP.get(key, [raw])  # default: try package name as import
-    ok = False
-    for mod in imports:
+failed=[]
+ok=[]
+for raw in req_names():
+    key=raw.lower()
+    mods=NAME_MAP.get(key,[raw])
+    last_err=None
+    for m in mods:
         try:
-            __import__(mod)
-            tested.append((raw, mod, "OK"))
-            ok = True
+            __import__(m)
+            ok.append((raw,m))
             break
         except Exception as e:
-            err = e
-    if not ok:
-        failed.append((raw, imports, str(err)))
+            last_err=e
+    else:
+        failed.append((raw,mods,str(last_err)))
 
 if failed:
-    print("\nValidation FAILED. The following imports could not be loaded:\n")
-    for pkg, mods, err in failed:
-        print(f" - package '{pkg}' -> tried imports {mods} -> error: {err}")
+    print("Validation FAILED:", file=sys.stderr)
+    for pkg,mods,err in failed:
+        print(f" - {pkg} -> tried {mods} -> {err}", file=sys.stderr)
     sys.exit(1)
 
-print("\nValidation OK. All required modules imported successfully:")
-for pkg, mod, _ in tested:
+print("Validation OK:")
+for pkg,mod in ok:
     print(f" - {pkg} (import '{mod}')")
 PY
 
