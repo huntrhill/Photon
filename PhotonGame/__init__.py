@@ -21,7 +21,8 @@ def build_main_window(ctrl):
     stacked.addWidget(game)
 
     stacked.setWindowTitle("Photon Laser Tag")
-    stacked.resize(1024, 640)
+    stacked.resize(1024, 640)   # initial; user can resize
+    stacked.setMinimumSize(800, 500)  # optional guard
     stacked.show()
 
     return stacked, splash, entry, game, ASSETS_DIR
