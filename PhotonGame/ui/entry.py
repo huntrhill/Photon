@@ -38,17 +38,19 @@ class Star:
             self.reset()
 
 class StarField(QWidget):
-    def __init__(self, width, height, num_stars=200):
+    def __init__(self, width=0, height=0, num_stars=200):
         super().__init__()
-        self.setFixedSize(width, height)
-        self.stars = [Star(width, height) for _ in range(num_stars)]
+        # let layouts control size; be expandable
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        # create stars relative to an initial guess; positions will adjust as we draw
+        self.stars = [Star(1600, 900) for _ in range(num_stars)]
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update)
         self.timer.start(30)
 
-        # Layout to hold tables and form
         self.main_layout = QHBoxLayout()
-        self.main_layout.setContentsMargins(50, 50, 50, 50)
+        self.main_layout.setContentsMargins(24, 24, 24, 24)
         self.setLayout(self.main_layout)
 
     def add_widget_layout(self, layout):
@@ -58,13 +60,27 @@ class StarField(QWidget):
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor("black"))
         painter.setPen(QColor("white"))
-        width = self.width() / 2
-        height = self.height() / 2
+
+        w = max(1, self.width())
+        h = max(1, self.height())
+        cx = w / 2
+        cy = h / 2
+        # scale factor keeps density similar at different sizes
+        depth_scale = max(w, h) / 2
+
         for star in self.stars:
-            sx = int((star.x - width) / star.z * 300 + width)
-            sy = int((star.y - height) / star.z * 300 + height)
-            painter.drawPoint(sx, sy)
-            star.move()
+            # project star based on current widget size
+            sx = int((star.x - cx) / max(1, star.z) * (depth_scale * 0.6) + cx)
+            sy = int((star.y - cy) / max(1, star.z) * (depth_scale * 0.6) + cy)
+            if 0 <= sx < w and 0 <= sy < h:
+                painter.drawPoint(sx, sy)
+            star.move(speed=5)
+            # if star “passes” the viewer, respawn at current size
+            if star.z <= 0:
+                star.x = random.randint(0, w)
+                star.y = random.randint(0, h)
+                star.z = random.randint(1, depth_scale)
+
 
 
 # ---------- EntryScreen wrapper (new) ----------
@@ -86,25 +102,30 @@ class EntryScreen(QWidget):
         root.addWidget(self.starfield)
 
         # ---------- Left/Right team tables ----------
-        def create_table(team):
-            table = QTableWidget()
-            table.setRowCount(0)              # dynamic rows
-            table.setColumnCount(2)
-            table.setHorizontalHeaderLabels(["PlayerID", "Codename"])
-            table.verticalHeader().setVisible(False)
-            table.setSelectionBehavior(QTableWidget.SelectRows)
-            table.setSelectionMode(QTableWidget.SingleSelection)
-            table.setFixedWidth(550)
-            table.setFixedHeight(650)
-            table.setColumnWidth(0, 274)
-            table.setColumnWidth(1, 275)
-            table.setStyleSheet(
-                "background-color: rgba(0, 0, 0, 0); color: white; "
-                f"gridline-color: {'red' if team=='red' else 'green'};"
-            )
-            table.horizontalHeader().setStretchLastSection(True)
-            return table
-
+    def create_table(team):
+        table = QTableWidget()
+        table.setRowCount(0)  # dynamic
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels(["PlayerID", "Codename"])
+        table.verticalHeader().setVisible(False)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setSelectionMode(QTableWidget.SingleSelection)
+    
+        # Let tables grow with window
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    
+        # Stretch columns to available space
+        hdr = table.horizontalHeader()
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(1, QHeaderView.Stretch)
+    
+        color = "red" if team == "red" else "green"
+        table.setStyleSheet(
+            "background-color: rgba(0,0,0,0); color: white; "
+            f"gridline-color: {color};"
+        )
+        return table
+    
         self.red_table   = create_table("red")
         self.green_table = create_table("green")
 
@@ -122,12 +143,14 @@ class EntryScreen(QWidget):
 
         # Logo
         logo_label = QLabel()
-        logo_path = f"{self.assets_dir}/images/logo.jpg"
-        pm = QPixmap(logo_path)
-        if not pm.isNull():
-            logo_label.setPixmap(pm.scaledToWidth(200, Qt.SmoothTransformation))
         logo_label.setAlignment(Qt.AlignCenter)
+        pm = QPixmap(f"{self.assets_dir}/images/logo.jpg")
+        if not pm.isNull():
+            logo_label.setPixmap(pm)
+            logo_label.setScaledContents(True)   # allow QLabel to scale the pixmap
+            logo_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         center.addWidget(logo_label)
+
 
         form = QFormLayout()
         self.id_input   = QLineEdit(); self.id_input.setPlaceholderText("Enter Player ID (integer)")
@@ -171,9 +194,9 @@ class EntryScreen(QWidget):
 
         # Wire to starfield layout (left | center | right)
         main_layout = QHBoxLayout()
-        main_layout.addLayout(red_layout)
-        main_layout.addLayout(center)
-        main_layout.addLayout(green_layout)
+        main_layout.addLayout(red_layout,   1)   # stretch factor
+        main_layout.addLayout(center,       1)
+        main_layout.addLayout(green_layout, 1)
         self.starfield.add_widget_layout(main_layout)
 
         # Wiring to app.py via signals
