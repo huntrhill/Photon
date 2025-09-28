@@ -4,6 +4,8 @@ from .db import get_player, add_player
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 IMAGES_DIR = os.path.join(ASSETS_DIR, "images")
+BASE_ICON_PATH = os.path.join(ASSETS_DIR, "images", "baseicon.jpg")
+BASE_ICON = QtGui.QIcon(BASE_ICON_PATH) if os.path.exists(BASE_ICON_PATH) else None
 
 def build_main_window(ctrl):
     stacked = QtWidgets.QStackedWidget()
@@ -195,10 +197,16 @@ class GameScreen(QtWidgets.QWidget):
         rows.sort(key=lambda x: x[2], reverse=True)
         table.setRowCount(len(rows))
         for r,(pid,name,score) in enumerate(rows):
-            name_display = ("🏰 " + name) if pid in state.base_icon else name
+            # ID
             table.setItem(r,0,QtWidgets.QTableWidgetItem(str(pid)))
-            table.setItem(r,1,QtWidgets.QTableWidgetItem(name_display))
+            # Name (with optional base icon)
+            name_item = QtWidgets.QTableWidgetItem(name)
+            if pid in state.base_icon and BASE_ICON is not None:
+                name_item.setIcon(BASE_ICON)
+            table.setItem(r,1,name_item)
+            # Score
             table.setItem(r,2,QtWidgets.QTableWidgetItem(str(score)))
+
 
     def _pulse(self):
         lab = self.red_total if self._leader=="red" else (self.green_total if self._leader=="green" else None)
