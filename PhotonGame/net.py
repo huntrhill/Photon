@@ -1,37 +1,42 @@
 import asyncio, socket, os
-SEND_ADDR=os.getenv("PHOTON_SEND_ADDR","127.0.0.1")
-SEND_PORT=int(os.getenv("PHOTON_SEND_PORT","7500"))
-RECV_ADDR=os.getenv("PHOTON_BIND_ADDR","0.0.0.0")
-RECV_PORT=int(os.getenv("PHOTON_RECV_PORT","7501"))
+from dataclasses import dataclass
 
-def _tx_sock():
-    s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    s.setblocking(True)
-    return s
+@dataclass
+class Endpoints:
+    send_addr: str
+    send_port: int
+    recv_addr: str
+    recv_port: int
 
-async def udp_sender(q: asyncio.Queue):
+def endpoints_from_env() -> Endpoints:
+    return Endpoints(
+        send_addr=os.getenv("PHOTON_SEND_ADDR", "127.0.0.1"),
+        send_port=int(os.getenv("PHOTON_SEND_PORT", "7500")),
+        recv_addr=os.getenv("PHOTON_BIND_ADDR", "0.0.0.0"),
+        recv_port=int(os.getenv("PHOTON_RECV_PORT", "7501")),
+    )
+
+async def udp_sender(q: asyncio.Queue, ep: Endpoints, stop: asyncio.Event):
     loop = asyncio.get_running_loop()
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setblocking(False)
-    s.connect((SEND_ADDR, SEND_PORT))
+    s.connect((ep.send_addr, ep.send_port))
+    try:
+        while not stop.is_set():
+            val = await q.get()
+            msg = str(val)
+            await loop.sock_sendall(s, msg.encode("ascii"))
+    finally:
+        s.close()
 
-    while True:
-        val = await q.get()
-        if isinstance(val, int):
-            val = str(val)
-            print(val)
-        await loop.sock_sendall(s, str(val).encode("ascii"))
-
-
-
-async def udp_receiver(on_line):
+async def udp_receiver(on_line, ep: Endpoints, stop: asyncio.Event):
     loop = asyncio.get_running_loop()
     r = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    r.bind((RECV_ADDR, RECV_PORT))
+    r.bind((ep.recv_addr, ep.recv_port))
     r.setblocking(False)
-
-    while True:
-        data = await loop.sock_recv(r, 4096)
-        print(data)
-        await on_line(data.decode("ascii").strip())
+    try:
+        while not stop.is_set():
+            data = await loop.sock_recv(r, 4096)
+            await on_line(data.decode("ascii").strip())
+    finally:
+        r.close()
