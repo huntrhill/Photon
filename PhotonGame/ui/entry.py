@@ -13,7 +13,7 @@ import random
 from PyQt5.QtWidgets import (
     QWidget, QLineEdit, QLabel, QPushButton, QHBoxLayout, QVBoxLayout,
     QTableWidget, QTableWidgetItem, QSizePolicy, QFrame, QGroupBox,
-    QTableWidget, QMessageBox, QRadioButton, QFormLayout, QHeaderView, QShortcut
+    QTableWidget, QMessageBox, QRadioButton, QFormLayout, QHeaderView, QShortcut, QInputDialog
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPainter, QColor, QPixmap, QFont, QKeySequence
