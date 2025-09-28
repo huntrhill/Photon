@@ -18,7 +18,7 @@ def build_main_window(ctrl):
     stacked.setWindowTitle("Photon Laser Tag")
     stacked.resize(1024, 640)
     stacked.show()
-    return stacked, splash, entry, game, os.path.join(ASSETS_DIR, "audio", "tracks")
+   return stacked, splash, entry, game, ASSETS_DIR
 
 class SplashScreen(QtWidgets.QWidget):
     def __init__(self, parent=None):
