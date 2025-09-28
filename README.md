@@ -5,79 +5,89 @@ Written in **Python 3** with **PyQt5**, it connects to the provided **PostgreSQL
 
 ---
 
-## ✨ Features
+## Features
 
-- Splash screen (3s) with provided logo
-- Player entry screen:
+- **Splash screen** (3s) with provided logo
+- **Player entry screen**:
   - Enter **Player ID** → fetch codename from DB (`players` table)  
   - If not found → prompt codename and insert into DB  
-  - Enter **Equipment ID** → immediately broadcast over UDP (7500)
-  - Assign to **Red** or **Green** team (max 15 per team)
-- Game play screen:
-  - **6-minute timer** with **30-second warning** countdown
+  - Enter **Equipment ID** → immediately broadcast over UDP (port 7500)  
+  - Assign to **Red** or **Green** team (max 15 players each)
+- **Game play screen**:
+  - **6-minute timer** with **30-second warning countdown**
   - **Live play-by-play feed**
-  - **Cumulative team scores** and **individual player scores** (sorted high → low)
+  - **Cumulative team scores** and **individual scores** (sorted high → low)
   - **Scoring rules:**  
     - +10 for tagging opponent  
     - −10 for tagging same team (both tagger & tagged)  
-    - Base codes:  
-      - `53`: Red base scored → Green team +100 points, base icon added  
-      - `43`: Green base scored → Red team +100 points, base icon added
-  - High team score flashes during play
-  - Random MP3 track plays during the game, synced to countdown
-- End of game:
+    - Base scores:  
+      - `53`: Red base scored → Green +100 (base icon shown)  
+      - `43`: Green base scored → Red +100 (base icon shown)
+  - High team score **flashes** during play
+  - **Random MP3 track** plays during the game, synced to countdown
+- **End of game**:
   - Broadcast code **221** three times
-  - Remain on game screen with scores; operator can return to player entry
+  - Game screen remains visible; operator can return to entry screen
 
 ---
 
-## 📂 Assets
+## Assets
 
-This project includes only the assets needed from the instructor’s [photon-main](https://github.com/jstrother123/photon-main) repository.  
+This project pulls required assets (logo, sounds, MP3s) from the instructor’s [photon-main](https://github.com/jstrother123/photon-main) repository.  
+Local repo directories:
+PhotonGame/assets/
+├── images/ # logos, icons
+├── tracks/ # MP3 background music
+└── sfx/ # sound effects
+
 
 ---
 
-## 🖥️ System Requirements
+## System Requirements
 
 - **Debian 12+ VM** (provided by instructor)
 - **PostgreSQL** with database `photon` and table `players` already installed
-- Internet access (for package installs)
+- Internet access for package installs
 
 ---
 
-## 📦 Installation
+## Installation
 
 Clone the repo into your Debian VM:
 
 ```bash
-git clone [https://github.com/huntrhill/Photon.git](https://github.com/huntrhill/Photon.git)
+git clone https://github.com/huntrhill/Photon.git
 cd Photon
 chmod +x install.sh
 ./install.sh
 ```
----
 
-## 👥 Team
+The installer will:
 
-| GitHub | Real Name | Role |
-|---|---|---|
-| @huntrhill | Hunter Hill       | Lead / UI - Entry            |
-| @member2   | Chance Pickett    | UI – Splash/Scoring          |
-| @dugku     | Michael Purtle    | Networking/Audio / UI – Game |
-| @coaluh    | Cody Uhl          | QA / Docs / Architecture     |
+- Create a Python virtual environment (.venv)
 
-> All team members used real names on GitHub or are cross-referenced above.
+- Install dependencies from requirements.txt
+
+- If PyQt5 fails (common on Debian VMs), it will automatically install Debian’s system python3-pyqt5 and rebuild the venv with --system-site-packages
+
+- Validate that all modules import correctly (PyQt5, pygame, psycopg2, etc.)
 
 ---
 
-## 🔌 Quick Test (after install)
-
-Open **Terminal A** (listener for 7500):
+## Running
 ```bash
-python3 - <<'PY'
-import socket
-s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.bind(("0.0.0.0",7500))
-print("Listening on 0.0.0.0:7500…")
-while True: print(s.recvfrom(4096)[0].decode().strip())
-PY
+source .venv/bin/activate
+python3 main.py
+```
 
+---
+
+## Team 
+
+  GitHub	  |   Real Name	    |  Role
+@huntrhill	|  Hunter Hill    |	Lead / UI – Entry
+@member2	  |  Chance Pickett |	UI – Splash / Scoring
+@dugku      |  Michael Purtle | Networking / Audio / UI – Game
+@coaluh	    |  Cody Uhl	      | QA / Docs / Architecture
+
+All team members used real names on GitHub or are cross-referenced above.
