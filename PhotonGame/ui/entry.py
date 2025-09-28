@@ -80,7 +80,7 @@ class EntryScreen(QWidget):
 
     def _build_ui(self):
         # Starfield background container
-        self.starfield = StarField(1500, 800, num_stars=220)
+        self.starfield = StarField(1024, 640, num_stars=220)
         root = QVBoxLayout(self)
         root.setContentsMargins(0,0,0,0)
         root.addWidget(self.starfield)
