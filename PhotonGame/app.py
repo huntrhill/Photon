@@ -30,12 +30,13 @@ class Controller(QtCore.QObject):
 
     # ---------- Game lifecycle ----------
     def start_pre_game(self):
-        if self.game_running:
-            return
-        self.seconds_left = 30 + 6 * 60  # 30s warning + 6min game
-        play_sfx(self.sfx, "start")
-        play_random_music(self.tracks)
-        self.game_running = True
+    if self.game_running:
+        return
+    self.seconds_left = 30 + 6 * 60
+    play_sfx(self.sfx, "start")
+    stop_music()                     
+    play_random_music(self.tracks)
+    self.game_running = True
 
     def tick(self):
         if not self.game_running:
