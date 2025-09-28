@@ -110,8 +110,8 @@ def run_app():
     tick_timer.timeout.connect(ctrl.tick)
     tick_timer.start(1000)
 
-    # UDP coroutines share this loop
-   async def on_rx(line: str):
+# UDP coroutines share this loop
+async def on_rx(line: str):
     # Let scoring update state first
     handle_rx(ctrl.state, line, ctrl.send_int)
 
