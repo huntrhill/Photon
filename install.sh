@@ -1,106 +1,96 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export DEBIAN_FRONTEND=noninteractive
+echo "==> Using Python: $(command -v python3 || true)"
+echo "==> Using Pip:    $(command -v pip3 || true)"
 
-banner() { echo -e "\n\033[1;36m$*\033[0m"; }
-warn()   { echo -e "\n\033[1;33m$*\033[0m"; }
-die()    { echo -e "\n\033[1;31m$*\033[0m"; exit 1; }
-
-banner "Updating apt (requires sudo)…"
-sudo apt-get update -y
-
-banner "Installing base system deps…"
-sudo apt-get install -y \
-  python3-venv python3-dev python3-pip \
-  build-essential libpq-dev \
-  libgl1 libglib2.0-0 libx11-xcb1 libxkbcommon-x11-0 \
-  libpulse0 libasound2 \
-  mpg123 git curl ca-certificates
-
-# (Re)create venv — may be recreated later if we fall back to system PyQt5/pygame
-if [ ! -d ".venv" ]; then
-  banner "Creating Python virtual environment (.venv)…"
-  python3 -m venv .venv
+# 1) Minimal system prerequisites (kept simple)
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "Python3 not found. Please install Python 3 first."
+  exit 1
+fi
+if ! command -v python3 -m venv >/dev/null 2>&1; then
+  echo "python3-venv not available. On Debian: sudo apt-get update && sudo apt-get install -y python3-venv"
+  exit 1
 fi
 
-banner "Activating venv & upgrading pip toolchain…"
+# 2) Create venv (if missing) and upgrade toolchain
+if [ ! -d ".venv" ]; then
+  echo "==> Creating virtual environment (.venv)…"
+  python3 -m venv .venv
+fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 
-# Ensure requirements exist
+# 3) Install requirements
 if [ ! -f "requirements.txt" ]; then
-  cat > requirements.txt <<'REQ'
-PyQt5==5.15.11
-psycopg2-binary==2.9.9
-pygame==2.6.1
-python-dotenv==1.0.1
-REQ
+  echo "requirements.txt not found in current directory."
+  exit 1
 fi
 
-# Prefer binary wheels to avoid heavy source builds
-export PIP_ONLY_BINARY=":all:"
+echo "==> Installing Python dependencies from requirements.txt…"
+pip install -r requirements.txt
 
-banner "Installing Python deps from requirements.txt (prefer wheels)…"
-if ! pip install -r requirements.txt; then
-  warn "Bulk pip install failed — installing one by one with fallbacks…"
-
-  NEED_SYSTEM_PYQT5=0
-  NEED_SYSTEM_PYGAME=0
-
-  # ---- PyQt5 ----
-  if ! pip install "PyQt5==5.15.11"; then
-    warn "PyQt5 wheel failed. Trying 5.15.10…"
-    if ! pip install "PyQt5==5.15.10"; then
-      warn "PyQt5 wheels unavailable; will use Debian system PyQt5."
-      NEED_SYSTEM_PYQT5=1
-    fi
-  fi
-
-  # ---- pygame ----
-  if ! pip install "pygame==2.6.1"; then
-    warn "pygame wheel failed; will use Debian system pygame."
-    NEED_SYSTEM_PYGAME=1
-  fi
-
-  # ---- Remaining deps ----
-  pip install "psycopg2-binary==2.9.9" "python-dotenv==1.0.1" || true
-
-  # ---- System fallbacks ----
-  if [ "$NEED_SYSTEM_PYQT5" -eq 1 ]; then
-    banner "Installing Debian's PyQt5…"
-    sudo apt-get install -y python3-pyqt5 python3-pyqt5.qtmultimedia
-  fi
-
-  if [ "$NEED_SYSTEM_PYGAME" -eq 1 ]; then
-    banner "Installing Debian's pygame (+ SDL2 runtimes)…"
-    sudo apt-get install -y python3-pygame \
-      libsdl2-2.0-0 libsdl2-mixer-2.0-0 libsdl2-image-2.0-0 libsdl2-ttf-2.0-0
-  fi
-
-  if [ "$NEED_SYSTEM_PYQT5" -eq 1 ] || [ "$NEED_SYSTEM_PYGAME" -eq 1 ]; then
-    warn "Recreating venv with --system-site-packages so Python sees system libs…"
-    deactivate || true
-    rm -rf .venv
-    python3 -m venv .venv --system-site-packages
-    # shellcheck disable=SC1091
-    source .venv/bin/activate
-    python -m pip install --upgrade pip setuptools wheel
-    pip install "psycopg2-binary==2.9.9" "python-dotenv==1.0.1"
-  fi
-fi
-
-banner "Verifying imports…"
+# 4) Validate imports (maps package names to import names)
 python - <<'PY'
-try:
-    import PyQt5, pygame, psycopg2
-    print("Imports OK: PyQt5, pygame, psycopg2")
-except Exception as e:
-    raise SystemExit(f"Import check failed: {e}")
+import sys, re
+
+# Map package name -> import name(s)
+NAME_MAP = {
+    # common package -> module mappings
+    'psycopg2-binary': ['psycopg2'],
+    'python-dotenv':   ['dotenv'],
+    'pyqt5':           ['PyQt5'],
+    'pyqt6':           ['PyQt6'],
+    'pygame':          ['pygame'],
+    'qasync':          ['qasync'],
+}
+
+def parse_requirements(path="requirements.txt"):
+    pkgs = []
+    pat = re.compile(r'^\s*([A-Za-z0-9_.\-]+)')
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            s=line.strip()
+            if not s or s.startswith('#'): 
+                continue
+            m = pat.match(s)
+            if m:
+                pkgs.append(m.group(1))
+    return pkgs
+
+failed = []
+tested = []
+
+for raw in parse_requirements():
+    key = raw.lower()
+    imports = NAME_MAP.get(key, [raw])  # default: try package name as import
+    ok = False
+    for mod in imports:
+        try:
+            __import__(mod)
+            tested.append((raw, mod, "OK"))
+            ok = True
+            break
+        except Exception as e:
+            err = e
+    if not ok:
+        failed.append((raw, imports, str(err)))
+
+if failed:
+    print("\nValidation FAILED. The following imports could not be loaded:\n")
+    for pkg, mods, err in failed:
+        print(f" - package '{pkg}' -> tried imports {mods} -> error: {err}")
+    sys.exit(1)
+
+print("\nValidation OK. All required modules imported successfully:")
+for pkg, mod, _ in tested:
+    print(f" - {pkg} (import '{mod}')")
 PY
 
-banner "Install complete!"
+echo ""
+echo "✅ Install complete."
 echo "To run:"
 echo "  source .venv/bin/activate"
 echo "  python3 main.py"
