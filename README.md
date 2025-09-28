@@ -82,12 +82,13 @@ python3 main.py
 
 ---
 
-## Team 
+## 👥 Team
 
-  GitHub	  |   Real Name	    |  Role
-@huntrhill	|  Hunter Hill    |	Lead / UI – Entry
-@member2	  |  Chance Pickett |	UI – Splash / Scoring
-@dugku      |  Michael Purtle | Networking / Audio / UI – Game
-@coaluh	    |  Cody Uhl	      | QA / Docs / Architecture
+| GitHub     | Real Name       | Role                           |
+|------------|-----------------|--------------------------------|
+| @huntrhill | Hunter Hill     | Lead / UI – Entry              |
+| @member2   | Chance Pickett  | UI – Splash / Scoring          |
+| @dugku     | Michael Purtle  | Networking / Audio / UI – Game |
+| @coaluh    | Cody Uhl        | QA / Docs / Architecture       |
 
 All team members used real names on GitHub or are cross-referenced above.
