@@ -47,7 +47,7 @@ class GameScreen(QtWidgets.QWidget):
         # Flash leader
         self._leader = None
         self._flash_on = False
-        self._flash_timer = QtWidgets.QTimer(self)
+        self._flash_timer = QtCore.QTimer(self)
         self._flash_timer.timeout.connect(self._pulse)
         self._flash_timer.start(500)
 
