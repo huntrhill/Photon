@@ -1,15 +1,12 @@
 import os, random, pygame
 from pathlib import Path
-def init_tracks(path):
-	pygame.mixer.init()
-	assests = Path(path)
-	
-	tracks_dir = assests if assests.name == "tracks" else (assests / "tracks")
-	mp3s = sorted(p for p in tracks_dir.iterdir() if p.is_file() and p.suffix.lower() == ".mp3")
-	return mp3s
+
+def init_tracks(tracks_path):
+    pygame.mixer.init()
+    p = Path(tracks_path)  # this should already be assets/audio/tracks
+    return sorted([str(f) for f in p.iterdir() if f.is_file() and f.suffix.lower() in (".mp3", ".wav")])
 
 def play_random(tracks):
-	if not tracks: return
-	pygame.mixer.music.load(random.choice(tracks))
-	pygame.mixer.music.play()
-
+    if not tracks: return
+    pygame.mixer.music.load(random.choice(tracks))
+    pygame.mixer.music.play()
