@@ -6,6 +6,7 @@ from .net import udp_sender, udp_receiver, Endpoints, endpoints_from_env
 from .scoring import State, handle_rx
 from .audio import init_audio, play_random_music, stop_music, play_sfx
 from . import build_main_window  # from package-local __init__.py
+from typing import Optional
 
 
 class Controller(QtCore.QObject):
@@ -153,7 +154,7 @@ def run_app():
         sys.exit(loop.run_forever())
 
 
-def on_add_player(ctrl: Controller, entry, pid: int, codename: str | None, eqid: int, team: str):
+def on_add_player(ctrl: Controller, entry, pid: int, eqid: int, team: str, codename: Optional[str] = None):
     row = entry.get_or_create_player(pid, codename)
     if isinstance(row, dict):
         pid2, codename2 = row.get("id"), row.get("codename")
