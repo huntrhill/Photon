@@ -87,7 +87,7 @@ python3 main.py
 | GitHub     | Real Name       | Role                           |
 |------------|-----------------|--------------------------------|
 | @huntrhill | Hunter Hill     | Lead / UI – Entry              |
-| @member2   | Chance Pickett  | UI – Splash / Scoring          |
+| @chancePRO | Chance Pickett  | UI – Splash / Scoring          |
 | @dugku     | Michael Purtle  | Networking / Audio / UI – Game |
 | @coaluh    | Cody Uhl        | QA / Docs / Architecture       |
 
