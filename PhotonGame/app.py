@@ -26,7 +26,7 @@ class Controller(QtCore.QObject):
         self._stop_event: asyncio.Event | None = None
         self._tasks: tuple[asyncio.Task, asyncio.Task] | tuple = ()
 
-    def send_int(self, val: int):
+    def send_int(self, val: str):
         self.tx_queue.put_nowait(int(val))
 
     # ---------- Game lifecycle ----------
@@ -102,7 +102,7 @@ def run_app():
 
     # wire UI
     entry.addPlayerRequested.connect(
-        lambda pid, codename, eqid, team: on_add_player(ctrl, entry, pid, codename, eqid, team)
+        lambda pid, codename, eqid, team: on_add_player(ctrl, entry, pid,  eqid, team, codename)
     )
     entry.startRequested.connect(lambda: on_start(ctrl, win, game))
     entry.clearRequested.connect(lambda: on_clear(ctrl, entry))
@@ -156,6 +156,7 @@ def run_app():
 
 def on_add_player(ctrl: Controller, entry, pid: int, eqid: int, team: str, codename: Optional[str] = None):
     row = entry.get_or_create_player(pid, codename)
+    print(row)
     if isinstance(row, dict):
         pid2, codename2 = row.get("id"), row.get("codename")
     else:
