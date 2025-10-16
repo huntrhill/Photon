@@ -3,6 +3,8 @@ import os
 
 class GameScreen(QtWidgets.QWidget):
     backRequested = QtCore.pyqtSignal()
+    gameStarted   = QtCore.pyqtSignal()
+    gameEnded     = QtCore.pyqtSignal()
 
     def __init__(self, parent=None, assets_dir=""):
         super().__init__(parent)
@@ -11,7 +13,28 @@ class GameScreen(QtWidgets.QWidget):
         p = os.path.join(self.assets_dir, "images", "baseicon.jpg")
         if os.path.exists(p):
             self._base_icon = QtGui.QIcon(p)
+
+        # timers/state
+        self._leader = None
+        self._flash_on = False
+        self._countdown_secs = 0
+        self._game_secs_remaining = 6 * 60  # default 6:00
+
         self._build_ui()
+        self._install_timers()
+
+    def _install_timers(self):
+        self._flash_timer = QtCore.QTimer(self)
+        self._flash_timer.timeout.connect(self._pulse)
+        self._flash_timer.start(500)
+
+        self._countdown_timer = QtCore.QTimer(self)
+        self._countdown_timer.setInterval(1000)
+        self._countdown_timer.timeout.connect(self._tick_countdown)
+
+        self._game_timer = QtCore.QTimer(self)
+        self._game_timer.setInterval(1000)
+        self._game_timer.timeout.connect(self._tick_game)
 
     def _build_ui(self):
         v = QtWidgets.QVBoxLayout(self)
@@ -44,12 +67,19 @@ class GameScreen(QtWidgets.QWidget):
         back_btn.clicked.connect(self.backRequested.emit)
         v.addWidget(back_btn, 0, alignment=QtCore.Qt.AlignRight)
 
-        # Flash leader
-        self._leader = None
-        self._flash_on = False
-        self._flash_timer = QtCore.QTimer(self)
-        self._flash_timer.timeout.connect(self._pulse)
-        self._flash_timer.start(500)
+        # Big overlay label for pre-game countdown
+        self.countdownLabel = QtWidgets.QLabel("", self)
+        self.countdownLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.countdownLabel.setStyleSheet(
+            "font-size:96px; font-weight:800; color:#fff; background:rgba(0,0,0,0.35);"
+        )
+        self.countdownLabel.hide()
+        self.countdownLabel.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        if self.countdownLabel:
+            self.countdownLabel.setGeometry(self.rect())
 
     def _make_table(self):
         t = QtWidgets.QTableWidget(0, 3)
@@ -99,7 +129,12 @@ class GameScreen(QtWidgets.QWidget):
         for r,(pid,name,score) in enumerate(rows):
             table.setItem(r, 0, QtWidgets.QTableWidgetItem(str(pid)))
             name_item = QtWidgets.QTableWidgetItem(name)
-            if pid in state.base_icon and self._base_icon is not None:
+            # safer: only use base_icon if present on state
+            try:
+                has_icon = (pid in state.base_icon)
+            except AttributeError:
+                has_icon = False
+            if has_icon and self._base_icon is not None:
                 name_item.setIcon(self._base_icon)
             table.setItem(r, 1, name_item)
             table.setItem(r, 2, QtWidgets.QTableWidgetItem(str(score)))
@@ -115,3 +150,56 @@ class GameScreen(QtWidgets.QWidget):
         else:
             lab.setStyleSheet("font-weight:bold; color: green;" if self._flash_on else "font-weight:bold; color: darkgreen;")
 
+    # ---------------- Countdown + Game control ----------------
+    def reset_to_idle(self, default_secs: int = 6*60):
+        """Fully stop timers and reset labels so a new start always works."""
+        self._countdown_timer.stop()
+        self._game_timer.stop()
+        self.countdownLabel.hide()
+        self._countdown_secs = 0
+        self._game_secs_remaining = default_secs
+        mins, secs = divmod(default_secs, 60)
+        self.timer_lbl.setText(f"{mins}:{secs:02d}")
+        # optional later: clear feed/totals if you want a fresh HUD each time
+        # self.feed.clear()
+        # self.red_total.setText("Red: 0"); self.green_total.setText("Green: 0")
+        # self._leader = None
+
+    def beginCountdownThenStart(self, secs:int = 5, game_length_secs:int = 6*60):
+        """Show a big N..3..2..1 overlay, then start the main match timer."""
+        self.reset_to_idle(default_secs=game_length_secs)
+        self._game_secs_remaining = game_length_secs
+
+        self._countdown_secs = max(0, int(secs))
+        if self._countdown_secs == 0:
+            self._start_match()
+            return
+
+        self.countdownLabel.setText(str(self._countdown_secs))
+        self.countdownLabel.show()
+        self._countdown_timer.start()
+
+    def _tick_countdown(self):
+        self._countdown_secs -= 1
+        if self._countdown_secs <= 0:
+            self.countdownLabel.hide()
+            self._countdown_timer.stop()
+            self._start_match()
+        else:
+            self.countdownLabel.setText(str(self._countdown_secs))
+
+    def _start_match(self):
+        self.gameStarted.emit()
+        self._update_timer_label()
+        self._game_timer.start()
+
+    def _tick_game(self):
+        self._game_secs_remaining -= 1
+        self._update_timer_label()
+        if self._game_secs_remaining <= 0:
+            self._game_timer.stop()
+            self.gameEnded.emit()
+
+    def _update_timer_label(self):
+        mins, secs = divmod(max(0, self._game_secs_remaining), 60)
+        self.timer_lbl.setText(f"{mins}:{secs:02d}")
