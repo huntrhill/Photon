@@ -20,6 +20,21 @@ def build_main_window(ctrl):
     stacked.addWidget(entry)
     stacked.addWidget(game)
 
+    # --- wiring: Entry -> Game (with countdown), Game -> Entry (reset) ---
+    def on_start_requested(countdown_secs: int):
+        # switch to game and run pre-game countdown, then start the match timer
+        stacked.setCurrentWidget(game)
+        game.beginCountdownThenStart(countdown_secs)
+
+    entry.startRequested.connect(on_start_requested)
+
+    def on_back_requested():
+        # fully stop timers/overlay so relaunch works next time
+        game.reset_to_idle()
+        stacked.setCurrentWidget(entry)
+
+    game.backRequested.connect(on_back_requested)
+
     stacked.setWindowTitle("Photon Laser Tag")
     stacked.resize(1024, 640)   # initial; user can resize
     stacked.setMinimumSize(800, 500)  # optional guard
