@@ -85,13 +85,17 @@ class StarField(QWidget):
 # ---------- EntryScreen ----------
 class EntryScreen(QWidget):
 	addPlayerRequested = pyqtSignal(int, object, int, str)  # pid, codename|None, eqid, team
-	startRequested     = pyqtSignal()
+	startRequested     = pyqtSignal(int)
 	clearRequested     = pyqtSignal()
 	
 	def __init__(self, parent=None, assets_dir: str = ""):
 		super().__init__(parent)
 		self.assets_dir = assets_dir
+		self._eqids = set()       # committed eqids currently in the roster tables
+		self._pending_eq = {}     # pid -> eqid, waiting to be committed when row is inserted
 		self._build_ui()
+		# --- NEW: initialize start button state ---
+        self._update_start_enabled()
 	
 	def _build_ui(self):
 		# Starfield container
@@ -155,17 +159,10 @@ class EntryScreen(QWidget):
 			w.setStyleSheet("background-color: #333; color: white; padding: 6px;")
 			w.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 	
-		self.red_radio = QRadioButton("Red")
-		self.green_radio = QRadioButton("Green")
-		self.red_radio.setChecked(True)
-		team_h = QHBoxLayout(); team_h.addWidget(self.red_radio); team_h.addWidget(self.green_radio)
-		team_w = QWidget(); team_w.setLayout(team_h)
-	
 		form = QFormLayout()
 		form.addRow("Player ID:", self.id_input)
 		form.addRow("Codename:", self.name_input)
 		form.addRow("Equipment ID:", self.eq_input)
-		form.addRow("Team:", team_w)
 		center.addLayout(form)
 	
 		# Buttons
@@ -209,28 +206,40 @@ class EntryScreen(QWidget):
 	
 	# ---- helpers / API used by app.py ----
 	def _emit_add(self):
-		pid_text = self.id_input.text().strip()
-		eq_text  = self.eq_input.text().strip()
-		if not pid_text.isdigit() or not eq_text.isdigit():
-			QMessageBox.warning(self, "Invalid", "Player ID and Equipment ID must be integers.")
-			return
-		pid = int(pid_text)
-		eqid = int(eq_text)
-		team = "green" if eqid % 2 == 0 else "red"
-		print("Here")
-		codename = self.name_input.text().strip() or None
-		
-		# enforce 15 per team
-		table = self.red_table if team == "red" else self.green_table
-		if table.rowCount() >= 15:
-			QMessageBox.warning(self, "Team Full", "Max 15 players per team.")
-			return
-		
-		self.addPlayerRequested.emit(pid, codename, eqid, team)
-		self.result_label.setText(
-			f"Queued: Player {pid} ({'new' if codename else 'lookup'}), eq {eqid}, team {team}"
-		)
-		self.eq_input.clear()
+	    pid_text = self.id_input.text().strip()
+	    eq_text  = self.eq_input.text().strip()
+	    if not pid_text.isdigit() or not eq_text.isdigit():
+	        QMessageBox.warning(self, "Invalid", "Player ID and Equipment ID must be integers.")
+	        return
+	
+	    pid  = int(pid_text)
+	    eqid = int(eq_text)
+	
+	    # auto team from Equipment ID (even=green, odd=red)
+	    team = "green" if (eqid % 2 == 0) else "red"
+	    codename = self.name_input.text().strip() or None
+	
+	    # uniqueness check you already added
+	    if (eqid in self._eqids) or (eqid in self._pending_eq.values() and self._pending_eq.get(pid) != eqid):
+	        QMessageBox.critical(self, "Duplicate Equipment",
+	                             f"Equipment ID {eqid} is already assigned to another player.")
+	        return
+	
+	    # per-team cap still applies
+	    table = self.red_table if team == "red" else self.green_table
+	    if table.rowCount() >= 15:
+	        QMessageBox.warning(self, "Team Full", "Max 15 players per team.")
+	        return
+	
+	    self._pending_eq[pid] = eqid
+	    self.addPlayerRequested.emit(pid, codename, eqid, team)
+	    self.result_label.setText(
+	        f"Queued: Player {pid} ({'new' if codename else 'lookup'}), eq {eqid}, team {team}"
+	    )
+	    self.eq_input.clear()
+	    self._update_team_hint()  # if you kept the hint
+
+
 	
 	def get_or_create_player(self, pid: int, codename: Optional[str]):
 		row = get_player(pid)
@@ -250,14 +259,50 @@ class EntryScreen(QWidget):
 		return row
 	
 	def add_to_roster(self, pid: int, codename: str, team: str):
-		table = self.red_table if team == "red" else self.green_table
-		r = table.rowCount()
-		table.insertRow(r)
-		table.setItem(r, 0, QTableWidgetItem(str(pid)))
-		table.setItem(r, 1, QTableWidgetItem(codename))
+	    table = self.red_table if team == "red" else self.green_table
+	    r = table.rowCount()
+	    table.insertRow(r)
+	    table.setItem(r, 0, QTableWidgetItem(str(pid)))
+	    name_item = QTableWidgetItem(codename)
+	    table.setItem(r, 1, name_item)
+	    # ---- NEW: finalize equipment id into the committed set ----
+	    eqid = self._pending_eq.pop(pid, None)
+	    if eqid is not None:
+	        self._eqids.add(eqid)
+	        # store eqid on the row (hidden metadata) in case you need it later
+	        name_item.setData(Qt.UserRole, eqid)
+		# --- NEW ---
+    	self._update_start_enabled()
 	
 	def clear_rosters(self):
-		self.red_table.setRowCount(0)
-		self.green_table.setRowCount(0)
-		self.result_label.setText("Cleared.")
+	    self.red_table.setRowCount(0)
+	    self.green_table.setRowCount(0)
+	    self.result_label.setText("Cleared.")
+	    # ---- NEW ----
+	    self._eqids.clear()
+	    self._pending_eq.clear()
+		# --- NEW ---
+    	self._update_start_enabled()
+
+	def _team_counts(self):
+	    return self.red_table.rowCount(), self.green_table.rowCount()
+	
+	def _ready_to_start(self) -> bool:
+	    r, g = self._team_counts()
+	    return (r >= 1) and (g >= 1)
+	
+	def _update_start_enabled(self):
+	    ready = self._ready_to_start()
+	    self.start_btn.setEnabled(ready)
+	    self.start_btn.setToolTip("" if ready else "Need at least 1 player on each team to start.")
+
+	def _update_team_hint(self):
+	    t = self.eq_input.text().strip()
+	    team = None
+	    if t.isdigit():
+	        eqid = int(t)
+	        team = "green" if (eqid % 2 == 0) else "red"
+	    self.team_hint.setText(f"Team: {team if team else '—'}")
+
+
 	
