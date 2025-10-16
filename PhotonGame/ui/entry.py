@@ -216,7 +216,7 @@ class EntryScreen(QWidget):
 			return
 		pid = int(pid_text)
 		eqid = int(eq_text)
-		team = "green" if pid % 2 == 0 else "red"
+		team = "green" if eqid % 2 == 0 else "red"
 		print("Here")
 		codename = self.name_input.text().strip() or None
 		
