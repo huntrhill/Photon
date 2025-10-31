@@ -141,26 +141,33 @@ def play_sfx(sfx: dict, name: str):
 
 def play_random_music_for_seconds(tracks: list[str], seconds: int):
     """
-    Pick a random MP3 from `tracks`, play it now, and fade to silence
-    exactly when `seconds` elapse (to match the pre-game countdown).
+    Pick a random MP3 from `tracks`, play it immediately,
+    and fade to silence exactly when `seconds` elapse.
+    Used for syncing pre-game countdown music.
     """
     if seconds <= 0:
+        print("[audio] Invalid countdown duration; skipping music.")
         return
-    stop_music()
+
+    stop_music()  # stop any existing playback
+
     if not tracks:
-        print("[audio] No tracks to play.", file=sys.stderr)
+        print("[audio] No tracks to play.")
         return
 
     shuffled = tracks[:]
     random.shuffle(shuffled)
+
     for p in shuffled:
         try:
             pygame.mixer.music.load(p)
+            pygame.mixer.music.set_volume(1.0)  # full volume (adjust if needed)
             pygame.mixer.music.play()
-            pygame.mixer.music.fadeout(int(seconds * 1000))  # sync with countdown
+            pygame.mixer.music.fadeout(int(seconds * 1000))  # sync fadeout with countdown
+            print(f"[audio] Now playing: {os.path.basename(p)} ({seconds}s countdown)")
             return
         except Exception as e:
             print(f"[audio] Skipping track {p}: {e}", file=sys.stderr)
             continue
-    print("[audio] No playable MP3 tracks found.", file=sys.stderr)
 
+    print("[audio] No playable MP3 tracks found.", file=sys.stderr)
