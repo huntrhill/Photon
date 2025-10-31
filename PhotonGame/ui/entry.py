@@ -22,6 +22,8 @@ from PyQt5.QtGui import QPainter, QColor, QPixmap, QKeySequence
 
 from PhotonGame.db import get_player, add_player
 
+from PhotonGame import audio
+
 
 # ---------- Starfield Background ----------
 class Star:
@@ -92,6 +94,14 @@ class EntryScreen(QWidget):
         self._pending_eq = {}
         self._build_ui()
         self._update_start_enabled()
+        assets_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets"))
+        self.audio_ctx = audio.init_audio(assets_dir)  # {'tracks': [...], 'sfx': {...}}
+
+        # optional: stop music if user clears/cancels
+        try:
+            self.clearRequested.connect(audio.stop_music)
+        except Exception:
+            pass
 
     def _build_ui(self):
         self.setMinimumSize(900, 560)
@@ -204,10 +214,15 @@ class EntryScreen(QWidget):
     def _emit_start(self, secs:int):
         self.startRequested.emit(int(secs))
 
-    def _emit_start_if_ready(self, secs:int):
+    def _emit_start_if_ready(self, secs: int):
         if not self._ready_to_start():
             self.result_label.setText("Add at least 1 player to each team to start.")
             return
+
+        # Start random MP3 now and auto-fade when `secs` hits 0
+        audio.play_random_music_for_seconds(self.audio_ctx["tracks"], secs)
+
+        # continue your existing start flow
         self._emit_start(secs)
 
     def _emit_add(self):
