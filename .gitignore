@@ -210,3 +210,6 @@ __marimo__/
 tools/
 thing.py
 tester.py
+
+
+.idea/
