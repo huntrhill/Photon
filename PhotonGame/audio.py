@@ -139,12 +139,14 @@ def play_sfx(sfx: dict, name: str):
     except Exception as e:
         print(f"[audio] SFX '{name}' failed: {e}", file=sys.stderr)
 
-def play_random_music_for_seconds(tracks: list[str], seconds: int):
+def play_random_music_for_seconds(tracks: list[str], seconds: int = 30):
     """
     Pick a random MP3 from `tracks`, play it immediately,
     and fade to silence exactly when `seconds` elapse.
     Used for syncing pre-game countdown music.
     """
+    seconds = 17
+    print(seconds)
     if seconds <= 0:
         print("[audio] Invalid countdown duration; skipping music.")
         return

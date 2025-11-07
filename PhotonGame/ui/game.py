@@ -5,6 +5,9 @@ import time
 import math
 from typing import Optional
 
+DEFAULT_GAME_SECS = 6*60        # 6:00
+DEFAULT_PREGAME_SECS = 30 
+
 class Phase(Enum):
 	COUNTDOWN = 1
 	RUNNING = 2
@@ -165,7 +168,7 @@ class GameScreen(QtWidgets.QWidget):
 			lab.setStyleSheet("font-weight:bold; color: green;" if self._flash_on else "font-weight:bold; color: darkgreen;")
 
     # ---------------- Countdown + Game control ----------------
-	def reset_to_idle(self, default_secs: int = 6*60 + 30):
+	def reset_to_idle(self, default_secs: int = 6*60):
 		"""Fully stop timers and reset labels so a new start always works."""
 		self._countdown_timer.stop()
 		self._game_timer.stop()
@@ -183,13 +186,13 @@ class GameScreen(QtWidgets.QWidget):
 		# self.red_total.setText("Red: 0"); self.green_total.setText("Green: 0")
 		# self._leader = None
 
-	def beginCountdownThenStart(self, secs:int = 5, game_length_secs:int = 6*60 + 30):
-		"""Show a big N..3..2..1 overlay, then start the main match timer."""
+	def beginCountdownThenStart(self, secs: int = DEFAULT_PREGAME_SECS, game_length_secs: int = DEFAULT_GAME_SECS):
 		self.reset_to_idle(default_secs=game_length_secs)
 		self.phase = Phase.COUNTDOWN
 		self._game_secs_remaining = game_length_secs
 	
-		self._countdown_secs = max(0, int(secs))
+		# Force a flat 30s regardless of caller input
+		self._countdown_secs = DEFAULT_PREGAME_SECS
 		if self._countdown_secs == 0:
 			self._start_match()
 			return
@@ -197,7 +200,7 @@ class GameScreen(QtWidgets.QWidget):
 		self._countdown_deadline = time.monotonic() + self._countdown_secs
 		self.countdownLabel.setText(str(self._countdown_secs))
 		self.countdownLabel.show()
-		self._countdown_timer.start()  # interval 200 ms (set in _install_timers)
+		self._countdown_timer.start()  # interval set in _install_timers  # interval 200 ms (set in _install_timers)
 
 	def _tick_countdown(self):
 		if self._countdown_deadline is None:
@@ -233,6 +236,7 @@ class GameScreen(QtWidgets.QWidget):
 				self._game_deadline = None
 				self.phase = Phase.ENDED
 				self.gameEnded.emit()
+
 
 	def _update_timer_label(self):
 		mins, secs = divmod(max(0, self._game_secs_remaining), 60)
