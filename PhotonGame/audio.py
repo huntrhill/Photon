@@ -104,6 +104,12 @@ def init_audio(assets_dir: str):
     return {"tracks": track_paths, "sfx": sfx}
 
 # ---------- playback helpers ----------
+def is_music_playing() -> bool:
+    try:
+        return pygame.mixer.music.get_busy()
+    except Exception:
+        return False
+        
 def stop_music():
     try:
         pygame.mixer.music.stop()
@@ -145,14 +151,14 @@ def play_random_music_for_seconds(tracks: list[str], seconds: int = 30):
     and fade to silence exactly when `seconds` elapse.
     Used for syncing pre-game countdown music.
     """
-    seconds = 17
-    print(seconds)
     if seconds <= 0:
         print("[audio] Invalid countdown duration; skipping music.")
         return
 
-    stop_music()  # stop any existing playback
-
+    # don't double-start if something is already playing
+    if is_music_playing():
+        return
+    stop_music()  # ensure a clean start
     if not tracks:
         print("[audio] No tracks to play.")
         return
@@ -165,8 +171,9 @@ def play_random_music_for_seconds(tracks: list[str], seconds: int = 30):
             pygame.mixer.music.load(p)
             pygame.mixer.music.set_volume(1.0)  # full volume (adjust if needed)
             pygame.mixer.music.play()
-            pygame.mixer.music.fadeout(int(seconds * 1000))  # sync fadeout with countdown
-            print(f"[audio] Now playing: {os.path.basename(p)} ({seconds}s countdown)")
+            # Sync fadeout with requested total duration
+            pygame.mixer.music.fadeout(int(seconds * 1000))
+            # print(f"[audio] Now playing: {os.path.basename(p)} ({seconds}s)")
             return
         except Exception as e:
             print(f"[audio] Skipping track {p}: {e}", file=sys.stderr)
