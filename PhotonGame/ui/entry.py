@@ -100,6 +100,7 @@ class EntryScreen(QWidget):
         # optional: stop music if user clears/cancels
         try:
             self.clearRequested.connect(audio.stop_music)
+            self.clearRequested.connect(self._cancel_music_delay)
         except Exception:
             pass
 
@@ -162,14 +163,6 @@ class EntryScreen(QWidget):
         form.addRow("Codename:", self.name_input)
         form.addRow("Equipment ID:", self.eq_input)
 
-        # ---- NEW: countdown SpinBox ----
-        #self.countdown_spin = QSpinBox()
-        #self.countdown_spin.setRange(1, 30)
-        #self.countdown_spin.setValue(5)
-        #self.countdown_spin.setSuffix(" sec")
-        #form.addRow("Countdown:", self.countdown_spin)
-        # ------Only for testing------
-
         # Auto team hint
         self.team_hint = QLabel("Team: —")
         self.team_hint.setAlignment(Qt.AlignLeft)
@@ -220,7 +213,8 @@ class EntryScreen(QWidget):
             return
 
         # Start random MP3 now and auto-fade when `secs` hits 0
-        audio.play_random_music_for_seconds(self.audio_ctx["tracks"], secs)
+        #audio.play_random_music_for_seconds(self.audio_ctx["tracks"], secs)
+        self._schedule_countdown_music(secs, start_when_left=17)
 
         # continue your existing start flow
         self._emit_start(secs)
@@ -245,6 +239,20 @@ class EntryScreen(QWidget):
             return
 
         self._pending_eq[pid] = eqid
+        try:
+          player_row = self.get_or_create_player(pid, codename)
+        except ValueError as e:
+          QMessageBox.warning(self, "Codename required", str(e))
+          self.result_label.setText("Player creation canceled.")
+          self._pending_eq.pop(pid, None)
+          return
+
+    # Normalize (id, codename) regardless of row type
+    if isinstance(player_row, tuple):
+        pid_resolved, codename_resolved = player_row
+    else:
+        pid_resolved = player_row.get("id")
+        codename_resolved = player_row.get("codename")
         self.addPlayerRequested.emit(pid, codename, eqid, team)
         self.result_label.setText(
             f"Queued: Player {pid} ({'new' if codename else 'lookup'}), eq {eqid}, team {team}"
@@ -259,8 +267,10 @@ class EntryScreen(QWidget):
         if not codename:
             text, ok = QInputDialog.getText(self, "New Player", "Enter codename:")
             if not ok or not text.strip():
-                raise ValueError("Codename required.")
+                return None
+              
             codename = text.strip()
+          
         row = add_player(pid, codename)
         return (row.get("id"), row.get("codename")) if isinstance(row, dict) else row
 
@@ -304,3 +314,41 @@ class EntryScreen(QWidget):
             eqid = int(t)
             team = "green" if (eqid % 2 == 0) else "red"
         self.team_hint.setText(f"Team: {team if team else '—'}")
+   def _cancel_music_delay(self):
+      """Cancel a pending music start (used on Clear)."""
+        try:
+            if hasattr(self, "_music_delay") and self._music_delay.isActive():
+                self._music_delay.stop()
+        except Exception:
+            pass
+
+    def _schedule_countdown_music(self, secs:int, start_when_left:int=17):
+        """
+        Start music when `start_when_left` seconds remain in the pre-game countdown.
+        Example: secs=30, start_when_left=17 -> start at t=13 (after a 13s delay).
+        """
+        if not hasattr(self, "_music_delay"):
+            self._music_delay = QTimer(self)
+            self._music_delay.setSingleShot(True)
+
+        # cancel any existing delayed start
+        self._cancel_music_delay()
+
+        delay_ms = max(0, (secs - start_when_left) * 1000)
+        play_secs = max(1, min(start_when_left, secs))
+
+        # Avoid piling multiple .connect() calls
+        try:
+            self._music_delay.timeout.disconnect()
+        except Exception:
+            pass
+
+        def _go():
+            try:
+                audio.play_random_music_for_seconds(self.audio_ctx["tracks"], play_secs)
+            except Exception:
+                pass
+
+        self._music_delay.timeout.connect(_go)
+        self._music_delay.start(delay_ms)
+   
