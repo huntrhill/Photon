@@ -4,6 +4,7 @@ from enum import Enum
 import time
 import math
 from typing import Optional
+from PhotonGame import audio
 
 DEFAULT_GAME_SECS = 6*60        # 6:00
 DEFAULT_PREGAME_SECS = 30 
@@ -25,6 +26,13 @@ class GameScreen(QtWidgets.QWidget):
 		p = os.path.join(self.assets_dir, "images", "baseicon.jpg")
 		if os.path.exists(p):
 			self._base_icon = QtGui.QIcon(p)
+
+		# Audio init (tracks + sfx) for precise countdown-based start
+        try:
+            self.audio_ctx = audio.init_audio(self.assets_dir)
+        except Exception:
+            self.audio_ctx = {"tracks": [], "sfx": {}}
+        self._music_started = False
 	
 		self._build_ui()
 		self._install_timers()
@@ -109,7 +117,7 @@ class GameScreen(QtWidgets.QWidget):
 		return box
 
     # ---- API used by app.py ----
-	def refresh(self, state, seconds_left: Optional[int] = int):
+	def refresh(self, state, seconds_left: Optional[int] = None):
 		# (Do NOT update the timer label here; the timer handlers own it)
 		# Totals
 		red_total = sum(s for pid, s in state.score.items() if state.team.get(pid) == "red")
@@ -208,6 +216,19 @@ class GameScreen(QtWidgets.QWidget):
 		remaining = max(0, int(math.ceil(self._countdown_deadline - time.monotonic())))
 		if remaining != self._countdown_secs:
 			self._countdown_secs = remaining
+			# Start music EXACTLY when 17 seconds remain; continue into game
+            if (remaining == 17) and (not self._music_started):
+                try:
+                    # stop anything that could have been playing
+                    audio.stop_music()
+                except Exception:
+                    pass
+                try:
+                    total_play_secs = 17 + DEFAULT_GAME_SECS
+                    audio.play_random_music_for_seconds(self.audio_ctx["tracks"], total_play_secs)
+                    self._music_started = True
+                except Exception:
+                    pass
 			if remaining <= 0:
 				self.countdownLabel.hide()
 				self._countdown_timer.stop()
@@ -236,7 +257,11 @@ class GameScreen(QtWidgets.QWidget):
 				self._game_deadline = None
 				self.phase = Phase.ENDED
 				self.gameEnded.emit()
-
+				# Optional: stop/fade music at the very end
+                try:
+                    audio.stop_music()
+                except Exception:
+                    pass
 
 	def _update_timer_label(self):
 		mins, secs = divmod(max(0, self._game_secs_remaining), 60)
