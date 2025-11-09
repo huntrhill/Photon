@@ -15,13 +15,12 @@ from typing import Optional
 from PyQt5.QtWidgets import (
     QWidget, QLineEdit, QLabel, QPushButton, QHBoxLayout, QVBoxLayout,
     QTableWidget, QTableWidgetItem, QSizePolicy, QMessageBox,
-    QFormLayout, QHeaderView, QShortcut, QInputDialog, QSpinBox
+    QFormLayout, QHeaderView, QShortcut, QInputDialog
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPainter, QColor, QPixmap, QKeySequence
 
 from PhotonGame.db import get_player, add_player
-
 from PhotonGame import audio
 
 
@@ -84,8 +83,8 @@ class StarField(QWidget):
 # ---------- EntryScreen ----------
 class EntryScreen(QWidget):
     addPlayerRequested = pyqtSignal(int, object, int, str)
-    startRequested     = pyqtSignal(int)
-    clearRequested     = pyqtSignal()
+    startRequested = pyqtSignal(int)
+    clearRequested = pyqtSignal()
 
     def __init__(self, parent=None, assets_dir: str = ""):
         super().__init__(parent)
@@ -95,9 +94,8 @@ class EntryScreen(QWidget):
         self._build_ui()
         self._update_start_enabled()
         assets_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets"))
-        self.audio_ctx = audio.init_audio(assets_dir)  # {'tracks': [...], 'sfx': {...}}
+        self.audio_ctx = audio.init_audio(assets_dir)
 
-        # optional: stop music if user clears/cancels
         try:
             self.clearRequested.connect(audio.stop_music)
             self.clearRequested.connect(self._cancel_music_delay)
@@ -111,7 +109,6 @@ class EntryScreen(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.addWidget(self.starfield)
 
-        # ---------- Team tables ----------
         def create_table(team: str) -> QTableWidget:
             table = QTableWidget(0, 2)
             table.setHorizontalHeaderLabels(["PlayerID", "Codename"])
@@ -131,14 +128,19 @@ class EntryScreen(QWidget):
 
         self.red_table = create_table("red")
         self.green_table = create_table("green")
+
         red_label = QLabel("Photon Phantoms", alignment=Qt.AlignCenter)
         green_label = QLabel("Quantum Warriors", alignment=Qt.AlignCenter)
         red_label.setStyleSheet("color: red; font-weight: bold; font-size: 28px;")
         green_label.setStyleSheet("color: green; font-weight: bold; font-size: 28px;")
-        red_layout = QVBoxLayout(); red_layout.addWidget(red_label); red_layout.addWidget(self.red_table)
-        green_layout = QVBoxLayout(); green_layout.addWidget(green_label); green_layout.addWidget(self.green_table)
 
-        # ---------- Center form ----------
+        red_layout = QVBoxLayout()
+        red_layout.addWidget(red_label)
+        red_layout.addWidget(self.red_table)
+        green_layout = QVBoxLayout()
+        green_layout.addWidget(green_label)
+        green_layout.addWidget(self.green_table)
+
         center = QVBoxLayout()
         center.addStretch()
         logo_label = QLabel(alignment=Qt.AlignCenter)
@@ -151,10 +153,12 @@ class EntryScreen(QWidget):
                 logo_label.setMaximumHeight(160)
         center.addWidget(logo_label)
 
-        # Inputs
-        self.id_input   = QLineEdit(); self.id_input.setPlaceholderText("Enter Player ID (integer)")
-        self.name_input = QLineEdit(); self.name_input.setPlaceholderText("Codename (if new)")
-        self.eq_input   = QLineEdit(); self.eq_input.setPlaceholderText("Equipment ID (integer)")
+        self.id_input = QLineEdit()
+        self.id_input.setPlaceholderText("Enter Player ID (integer)")
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Codename (if new)")
+        self.eq_input = QLineEdit()
+        self.eq_input.setPlaceholderText("Equipment ID (integer)")
         for w in (self.id_input, self.name_input, self.eq_input):
             w.setStyleSheet("background-color:#333; color:white; padding:6px;")
 
@@ -163,48 +167,43 @@ class EntryScreen(QWidget):
         form.addRow("Codename:", self.name_input)
         form.addRow("Equipment ID:", self.eq_input)
 
-        # Auto team hint
         self.team_hint = QLabel("Team: —")
         self.team_hint.setAlignment(Qt.AlignLeft)
         self.team_hint.setStyleSheet("color:#bbb;")
         form.addRow("", self.team_hint)
         center.addLayout(form)
 
-        # Buttons
         btn_row = QHBoxLayout()
         self.lookup_btn = QPushButton("Add Player")
         self.lookup_btn.setStyleSheet("background-color:#555; color:white; padding:6px 10px;")
-        self.start_btn  = QPushButton("Start (F5)")
-        self.clear_btn  = QPushButton("Clear (F12)")
+        self.start_btn = QPushButton("Start (F5)")
+        self.clear_btn = QPushButton("Clear (F12)")
         btn_row.addWidget(self.lookup_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.start_btn)
         btn_row.addWidget(self.clear_btn)
         center.addLayout(btn_row)
 
-        # Result label
         self.result_label = QLabel("Ready", alignment=Qt.AlignCenter)
         self.result_label.setStyleSheet("color:#DDD; margin-top:6px;")
         center.addWidget(self.result_label)
         center.addStretch()
 
-        # Compose layout
         main_layout = QHBoxLayout()
         main_layout.addLayout(red_layout, 1)
         main_layout.addLayout(center, 1)
         main_layout.addLayout(green_layout, 1)
         self.starfield.add_widget_layout(main_layout)
 
-        # --- Connections ---
         self.lookup_btn.clicked.connect(self._emit_add)
         self.start_btn.clicked.connect(lambda: self._emit_start_if_ready(30))
         self.clear_btn.clicked.connect(self.clearRequested.emit)
-        QShortcut(QKeySequence("F5"),  self, activated=lambda: self._emit_start_if_ready(30))
+        QShortcut(QKeySequence("F5"), self, activated=lambda: self._emit_start_if_ready(30))
         QShortcut(QKeySequence("F12"), self, activated=self.clearRequested.emit)
         self.eq_input.textChanged.connect(self._update_team_hint)
 
     # ---- helpers / API ----
-    def _emit_start(self, secs:int):
+    def _emit_start(self, secs: int):
         self.startRequested.emit(int(secs))
 
     def _emit_start_if_ready(self, secs: int):
@@ -212,16 +211,12 @@ class EntryScreen(QWidget):
             self.result_label.setText("Add at least 1 player to each team to start.")
             return
 
-        # Start random MP3 now and auto-fade when `secs` hits 0
-        #audio.play_random_music_for_seconds(self.audio_ctx["tracks"], secs)
         self._schedule_countdown_music(secs, start_when_left=17)
-
-        # continue your existing start flow
         self._emit_start(secs)
 
     def _emit_add(self):
         pid_text = self.id_input.text().strip()
-        eq_text  = self.eq_input.text().strip()
+        eq_text = self.eq_input.text().strip()
         if not pid_text.isdigit() or not eq_text.isdigit():
             QMessageBox.warning(self, "Invalid", "Player ID and Equipment ID must be integers.")
             return
@@ -240,27 +235,32 @@ class EntryScreen(QWidget):
 
         self._pending_eq[pid] = eqid
         try:
-          player_row = self.get_or_create_player(pid, codename)
+            player_row = self.get_or_create_player(pid, codename)
         except ValueError as e:
-          QMessageBox.warning(self, "Codename required", str(e))
-          self.result_label.setText("Player creation canceled.")
-          self._pending_eq.pop(pid, None)
-          return
-					
-    	if isinstance(player_row, tuple):
-        	pid_resolved, codename_resolved = player_row
-    	else:
-        	pid_resolved = player_row.get("id")
-        	codename_resolved = player_row.get("codename")
-					
-        self.addPlayerRequested.emit(pid, codename, eqid, team)
+            QMessageBox.warning(self, "Codename required", str(e))
+            self.result_label.setText("Player creation canceled.")
+            self._pending_eq.pop(pid, None)
+            return
+
+        if player_row is None:
+            self.result_label.setText("Player creation canceled.")
+            self._pending_eq.pop(pid, None)
+            return
+
+        if isinstance(player_row, tuple):
+            pid_resolved, codename_resolved = player_row
+        else:
+            pid_resolved = player_row.get("id")
+            codename_resolved = player_row.get("codename")
+
+        self.addPlayerRequested.emit(pid_resolved, codename_resolved, eqid, team)
         self.result_label.setText(
-            f"Queued: Player {pid} ({'new' if codename else 'lookup'}), eq {eqid}, team {team}"
+            f"Queued: Player {pid_resolved} ({'new' if codename else 'lookup'}), eq {eqid}, team {team}"
         )
         self.eq_input.clear()
         self._update_team_hint()
 
-    def get_or_create_player(self, pid:int, codename:Optional[str]):
+    def get_or_create_player(self, pid: int, codename: Optional[str]):
         row = get_player(pid)
         if row:
             return (row.get("id"), row.get("codename")) if isinstance(row, dict) else row
@@ -268,13 +268,11 @@ class EntryScreen(QWidget):
             text, ok = QInputDialog.getText(self, "New Player", "Enter codename:")
             if not ok or not text.strip():
                 return None
-              
             codename = text.strip()
-          
         row = add_player(pid, codename)
         return (row.get("id"), row.get("codename")) if isinstance(row, dict) else row
 
-    def add_to_roster(self, pid:int, codename:str, team:str):
+    def add_to_roster(self, pid: int, codename: str, team: str):
         table = self.red_table if team == "red" else self.green_table
         r = table.rowCount()
         table.insertRow(r)
@@ -298,9 +296,9 @@ class EntryScreen(QWidget):
     def _team_counts(self):
         return self.red_table.rowCount(), self.green_table.rowCount()
 
-    def _ready_to_start(self)->bool:
-        r,g = self._team_counts()
-        return (r>=1) and (g>=1)
+    def _ready_to_start(self) -> bool:
+        r, g = self._team_counts()
+        return (r >= 1) and (g >= 1)
 
     def _update_start_enabled(self):
         ready = self._ready_to_start()
@@ -314,30 +312,26 @@ class EntryScreen(QWidget):
             eqid = int(t)
             team = "green" if (eqid % 2 == 0) else "red"
         self.team_hint.setText(f"Team: {team if team else '—'}")
-   def _cancel_music_delay(self):
-      """Cancel a pending music start (used on Clear)."""
+
+    def _cancel_music_delay(self):
+        """Cancel a pending music start (used on Clear)."""
         try:
             if hasattr(self, "_music_delay") and self._music_delay.isActive():
                 self._music_delay.stop()
         except Exception:
             pass
 
-    def _schedule_countdown_music(self, secs:int, start_when_left:int=17):
-        """
-        Start music when `start_when_left` seconds remain in the pre-game countdown.
-        Example: secs=30, start_when_left=17 -> start at t=13 (after a 13s delay).
-        """
+    def _schedule_countdown_music(self, secs: int, start_when_left: int = 17):
+        """Start music when `start_when_left` seconds remain in countdown."""
         if not hasattr(self, "_music_delay"):
             self._music_delay = QTimer(self)
             self._music_delay.setSingleShot(True)
 
-        # cancel any existing delayed start
         self._cancel_music_delay()
 
         delay_ms = max(0, (secs - start_when_left) * 1000)
         play_secs = max(1, min(start_when_left, secs))
 
-        # Avoid piling multiple .connect() calls
         try:
             self._music_delay.timeout.disconnect()
         except Exception:
@@ -351,4 +345,3 @@ class EntryScreen(QWidget):
 
         self._music_delay.timeout.connect(_go)
         self._music_delay.start(delay_ms)
-   
