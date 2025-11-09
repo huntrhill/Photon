@@ -98,7 +98,6 @@ class EntryScreen(QWidget):
 
         try:
             self.clearRequested.connect(audio.stop_music)
-            self.clearRequested.connect(self._cancel_music_delay)
         except Exception:
             pass
 
@@ -211,7 +210,6 @@ class EntryScreen(QWidget):
             self.result_label.setText("Add at least 1 player to each team to start.")
             return
 
-        self._schedule_countdown_music(secs, start_when_left=17)
         self._emit_start(secs)
 
     def _emit_add(self):
@@ -312,36 +310,3 @@ class EntryScreen(QWidget):
             eqid = int(t)
             team = "green" if (eqid % 2 == 0) else "red"
         self.team_hint.setText(f"Team: {team if team else '—'}")
-
-    def _cancel_music_delay(self):
-        """Cancel a pending music start (used on Clear)."""
-        try:
-            if hasattr(self, "_music_delay") and self._music_delay.isActive():
-                self._music_delay.stop()
-        except Exception:
-            pass
-
-    def _schedule_countdown_music(self, secs: int, start_when_left: int = 17):
-        """Start music when `start_when_left` seconds remain in countdown."""
-        if not hasattr(self, "_music_delay"):
-            self._music_delay = QTimer(self)
-            self._music_delay.setSingleShot(True)
-
-        self._cancel_music_delay()
-
-        delay_ms = max(0, (secs - start_when_left) * 1000)
-        play_secs = max(1, min(start_when_left, secs))
-
-        try:
-            self._music_delay.timeout.disconnect()
-        except Exception:
-            pass
-
-        def _go():
-            try:
-                audio.play_random_music_for_seconds(self.audio_ctx["tracks"], play_secs)
-            except Exception:
-                pass
-
-        self._music_delay.timeout.connect(_go)
-        self._music_delay.start(delay_ms)
