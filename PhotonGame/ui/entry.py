@@ -246,13 +246,13 @@ class EntryScreen(QWidget):
           self.result_label.setText("Player creation canceled.")
           self._pending_eq.pop(pid, None)
           return
-
-    # Normalize (id, codename) regardless of row type
-    if isinstance(player_row, tuple):
-        pid_resolved, codename_resolved = player_row
-    else:
-        pid_resolved = player_row.get("id")
-        codename_resolved = player_row.get("codename")
+					
+    		if isinstance(player_row, tuple):
+        	pid_resolved, codename_resolved = player_row
+    		else:
+        	pid_resolved = player_row.get("id")
+        	codename_resolved = player_row.get("codename")
+					
         self.addPlayerRequested.emit(pid, codename, eqid, team)
         self.result_label.setText(
             f"Queued: Player {pid} ({'new' if codename else 'lookup'}), eq {eqid}, team {team}"
