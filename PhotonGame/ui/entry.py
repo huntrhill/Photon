@@ -163,12 +163,12 @@ class EntryScreen(QWidget):
         form.addRow("Equipment ID:", self.eq_input)
 
         # ---- NEW: countdown SpinBox ----
-        self.countdown_spin = QSpinBox()
-        self.countdown_spin.setRange(1, 30)
-        self.countdown_spin.setValue(5)
-        self.countdown_spin.setSuffix(" sec")
-        form.addRow("Countdown:", self.countdown_spin)
-        # --------------------------------
+        #self.countdown_spin = QSpinBox()
+        #self.countdown_spin.setRange(1, 30)
+        #self.countdown_spin.setValue(5)
+        #self.countdown_spin.setSuffix(" sec")
+        #form.addRow("Countdown:", self.countdown_spin)
+        # ------Only for testing------
 
         # Auto team hint
         self.team_hint = QLabel("Team: —")
@@ -204,9 +204,9 @@ class EntryScreen(QWidget):
 
         # --- Connections ---
         self.lookup_btn.clicked.connect(self._emit_add)
-        self.start_btn.clicked.connect(lambda: self._emit_start_if_ready(self.countdown_spin.value()))
+        self.start_btn.clicked.connect(lambda: self._emit_start_if_ready(30))
         self.clear_btn.clicked.connect(self.clearRequested.emit)
-        QShortcut(QKeySequence("F5"),  self, activated=lambda: self._emit_start_if_ready(self.countdown_spin.value()))
+        QShortcut(QKeySequence("F5"),  self, activated=lambda: self._emit_start_if_ready(30))
         QShortcut(QKeySequence("F12"), self, activated=self.clearRequested.emit)
         self.eq_input.textChanged.connect(self._update_team_hint)
 
