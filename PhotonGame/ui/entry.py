@@ -247,9 +247,9 @@ class EntryScreen(QWidget):
           self._pending_eq.pop(pid, None)
           return
 					
-    		if isinstance(player_row, tuple):
+    	if isinstance(player_row, tuple):
         	pid_resolved, codename_resolved = player_row
-    		else:
+    	else:
         	pid_resolved = player_row.get("id")
         	codename_resolved = player_row.get("codename")
 					
