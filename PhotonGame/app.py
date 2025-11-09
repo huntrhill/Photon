@@ -35,8 +35,7 @@ class Controller(QtCore.QObject):
             return
         self.seconds_left = 30 + 6 * 60
         play_sfx(self.sfx, "start")
-        stop_music()                     
-        play_random_music(self.tracks)
+        stop_music()
         self.game_running = True
 
     def tick(self):
@@ -104,7 +103,7 @@ def run_app():
     entry.addPlayerRequested.connect(
         lambda pid, codename, eqid, team: on_add_player(ctrl, entry, pid,  eqid, team, codename)
     )
-    entry.startRequested.connect(lambda: on_start(ctrl, win, game))
+    entry.startRequested.connect(lambda _secs=None: on_start(ctrl, win, game))
     entry.clearRequested.connect(lambda: on_clear(ctrl, entry))
     add_settings_button(entry, ctrl, win, game)  # Settings button
 
@@ -171,6 +170,7 @@ def on_start(ctrl: Controller, win, game):
     if not ctrl.game_running:
         ctrl.start_pre_game()
         win.setCurrentIndex(2)
+        game.beginCountdownThenStart()
         game.refresh(ctrl.state, ctrl.seconds_left)
 
 
