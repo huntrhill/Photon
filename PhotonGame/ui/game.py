@@ -25,7 +25,8 @@ class GameScreen(QtWidgets.QWidget):
         super().__init__(parent)
         self.assets_dir = assets_dir
         self._base_icon = None
-        p = os.path.join(self.assets_dir, "images", "baseicon.jpg")
+        #path for baseicon 
+        p = os.path.join("assests", "images", "baseicon.jpg")
         if os.path.exists(p):
             self._base_icon = QtGui.QIcon(p)
 
