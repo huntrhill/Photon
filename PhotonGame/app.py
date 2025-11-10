@@ -154,6 +154,16 @@ def run_app():
 
 
 def on_add_player(ctrl: Controller, entry, pid: int, eqid: int, team: str, codename: Optional[str] = None):
+    #error checking to see if a player is already on a team
+    if pid in ctrl.state.team:
+        existing_team = ctrl.state.team[pid]
+        if existing_team != team:
+            QtWidgets.QMessageBox.warning(
+                entry,
+                "Team Conflict",
+                f"Player {pid} is already assigned to {existing_team.upper()}!"
+            )
+            return
     row = entry.get_or_create_player(pid, codename)
     print(row)
     if isinstance(row, dict):
