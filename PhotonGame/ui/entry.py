@@ -256,6 +256,7 @@ class EntryScreen(QWidget):
             f"Queued: Player {pid_resolved} ({'new' if codename else 'lookup'}), eq {eqid}, team {team}"
         )
         self.eq_input.clear()
+        self.id_input.clear()
         self._update_team_hint()
 
     def get_or_create_player(self, pid: int, codename: Optional[str]):
