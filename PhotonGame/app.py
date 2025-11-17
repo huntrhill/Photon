@@ -153,26 +153,48 @@ def run_app():
         sys.exit(loop.run_forever())
 
 
-def on_add_player(ctrl: Controller, entry, pid: int, eqid: int, team: str, codename: Optional[str] = None):
-    #error checking to see if a player is already on a team
-    if pid in ctrl.state.team:
-        existing_team = ctrl.state.team[pid]
-        if existing_team != team:
-            QtWidgets.QMessageBox.warning(
-                entry,
-                "Team Conflict",
-                f"Player {pid} is already assigned to {existing_team.upper()}!"
-            )
-            return
+def on_add_player(
+    ctrl: Controller,
+    entry,
+    pid: int,
+    eqid: int,
+    team: str,
+    codename: Optional[str] = None,
+):
+    try:
+        eqid_int = int(eqid)
+    except (TypeError, ValueError):
+        QtWidgets.QMessageBox.warning(entry, "Invalid", f"Bad equipment id: {eqid!r}")
+        return
+
+    team = team.lower().strip()
+
+    if eqid_int in ctrl.state.team:
+        existing_team = ctrl.state.team[eqid_int]
+        QtWidgets.QMessageBox.warning(
+            entry,
+            "Equipment Conflict",
+            f"Equipment {eqid_int} is already assigned to {existing_team.upper()}!",
+        )
+        return
+
     row = entry.get_or_create_player(pid, codename)
     print(row)
+    if row is None:
+        return
+
     if isinstance(row, dict):
         pid2, codename2 = row.get("id"), row.get("codename")
     else:
         pid2, codename2 = row  # (id, codename)
-    ctrl.state.codename[pid2] = codename2
-    ctrl.state.team[pid2] = team
-    ctrl.send_int(eqid)  # broadcast equipment id immediately
+
+    ctrl.state.codename[eqid_int] = codename2
+    ctrl.state.team[eqid_int] = team
+    ctrl.state.eq_to_pid[eqid_int] = pid2   # <-- ADD THIS LINE
+
+    _ = ctrl.state.score[eqid_int]
+
+    ctrl.send_int(eqid_int)
     entry.add_to_roster(pid2, codename2, team)
 
 

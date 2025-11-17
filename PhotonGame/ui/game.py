@@ -21,12 +21,14 @@ class GameScreen(QtWidgets.QWidget):
     gameStarted = QtCore.pyqtSignal()
     gameEnded = QtCore.pyqtSignal()
 
-    def __init__(self, parent=None, assets_dir=""):
+    def __init__(self, parent=None, assets_dir="./assets/images"):
         super().__init__(parent)
         self.assets_dir = assets_dir
+        print(assets_dir)
         self._base_icon = None
         #path for baseicon 
-        p = os.path.join("assests", "images", "baseicon.jpg")
+        p = os.path.join(assets_dir,"images/baseicon.jpg")
+        print("here", p)
         if os.path.exists(p):
             self._base_icon = QtGui.QIcon(p)
 
@@ -137,6 +139,7 @@ class GameScreen(QtWidgets.QWidget):
         self.feed.clear()
         for line in state.feed[-200:]:
             self.feed.addItem(line)
+        self.feed.scrollToBottom()
 
         # Tables
         self._fill_team_table(self.red_table, state, "red")
@@ -150,21 +153,42 @@ class GameScreen(QtWidgets.QWidget):
         #     self._game_deadline = time.monotonic() + int(seconds_left)
 
     def _fill_team_table(self, table, state, team):
-        rows = [(pid, state.codename.get(pid, ""), state.score.get(pid, 0))
-                for pid, t in state.team.items() if t == team]
-        rows.sort(key=lambda x: x[2], reverse=True)  # by score desc
+        # eqid -> player-id mapping, if available
+        eq_to_pid = getattr(state, "eq_to_pid", {})
+
+        rows = []
+        for eqid, t in state.team.items():
+            if t != team:
+                continue
+
+            display_id = eq_to_pid.get(eqid, eqid)  # show player id if known, else fallback to eqid
+            name = state.codename.get(eqid, "")
+            score = state.score.get(eqid, 0)
+            rows.append((eqid, display_id, name, score))
+
+        # sort by score desc
+        rows.sort(key=lambda x: x[3], reverse=True)
+
         table.setRowCount(len(rows))
-        for r, (pid, name, score) in enumerate(rows):
-            table.setItem(r, 0, QtWidgets.QTableWidgetItem(str(pid)))
+        for r, (eqid, display_id, name, score) in enumerate(rows):
+            # Column 0: player id (display id)
+            table.setItem(r, 0, QtWidgets.QTableWidgetItem(str(display_id)))
+
+            # Column 1: codename (+ base icon)
             name_item = QtWidgets.QTableWidgetItem(name)
-            # safer: only use base_icon if present on state
             try:
-                has_icon = (pid in state.base_icon)
+                has_icon = (eqid in state.base_icon)
             except AttributeError:
                 has_icon = False
             if has_icon and self._base_icon is not None:
                 name_item.setIcon(self._base_icon)
+
+            # (Optional) show equipment id as tooltip
+            name_item.setToolTip(f"EqID: {eqid}")
+
             table.setItem(r, 1, name_item)
+
+            # Column 2: score
             table.setItem(r, 2, QtWidgets.QTableWidgetItem(str(score)))
 
     def _pulse(self):
